@@ -1,0 +1,11 @@
+*ipynb
+__pycache__/
+*.py[cod]
+*.jpg
+*.jpeg
+*.gif
+*.png
+*.txt
+*.mat
+*.zip
+datasets/

@@ -1,0 +1,46 @@
+# A dictionary the dictionary should contain the following keys:
+#         encoder_depth: int - the depth of the encoder
+#         depth: list[int] containing how many EncoderBlocks should be in each UNetBlock.
+#         kernel size: list[int or tuple] containing what kernel size of each EncoderBlock.
+#         stride: list[int or tuple] containing what stride of each EncoderBlock.
+#         padding: list[int or tuple] containing what padding of each EncoderBlock.
+#         norms: list[bool or nn.Module] containing what normalization of each EncoderBlock.
+#         acts: list[bool or nn.Module] containing what activation of each EncoderBlock.
+#         pool: list[bool or nn.Module] containing what pooling of each EncoderBlock.
+#         dropout: list[float] containing what dropout of each EncoderBlock.
+#         attention: list[bool] containing if attention should be used in each UNetBlock.
+#         img_size: int initial img size
+#         embed_dim: list[int] containing the embedding dimension of each UNetBlock.
+#         num_heads: list[int] containing the number of heads of each UNetBlock.
+#         patch_size: list[int] containing the patch size of each UNetBlock.
+#         attn_drop: list[float] containing the dropout of each UNetBlock.
+num_classes: 4
+steps: 4
+encoder:
+  img_size: 512
+  depth: [3,2,1,1]
+  kernel_size: 3
+  out_channels: [64, 128, 256, 512]
+  stride: 1
+  padding: 1
+  norms: True
+  acts: True
+  pool: True
+  dropout: 0.0
+  attention: [False,False,True,False] # Self Attention
+  embed_dim: 768
+  num_heads: 8
+  patch_size: [16,16,8,8]
+  attn_drop: 0.0
+
+decoder:
+  in_channels: [512, 256, 128, 64]
+  out_channels: [256, 128, 64, 32]
+  attention: [True,False,True,False] #[True,True,True,True]
+  embed_dim: 768
+  num_heads: 8
+  patch_size: [8,8,16,16]
+  attn_drop: 0.0
+  context_channels: [256, 128, 64, 3]
+  conv1x1: 1
+  conv3x3: 1
