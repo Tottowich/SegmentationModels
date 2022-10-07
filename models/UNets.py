@@ -618,5 +618,5 @@ class UNet(nn.Module):
         return self.encoder.latent_size
     @property
     def test_input(self):
-        return self.test_inp
+        return self.test_inp.to(self.device)
     
