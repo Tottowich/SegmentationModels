@@ -9,7 +9,7 @@ import torch.nn.functional as F
 import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
-from typing import List, Tuple, Dict, Union, Optional
+from typing import List, Tuple, Dict, Union, Optional, Any
 
     
 class Metric(object):
@@ -22,7 +22,8 @@ class Metric(object):
         """
         Reset the metric to its initial state.
         """
-        raise NotImplementedError
+        self.history = []
+        self._reset()
     def update(self, *args, **kwargs):
         """
         Update the metric with new data.
@@ -35,21 +36,11 @@ class Metric(object):
         """
         if value is None:
             raise ValueError("Metric has not been updated yet.")
-        self.history.append(value)
         print(f"{self.name}: {value}")
         if writer is not None:
             writer.add_scalar(self.name,self.history[-1],global_step)
         if ax is not None:
-            # ax.plot(self.history)
-            # ax set data
-            ax.set_ydata(self.history)
-            ax.set_xdata(range(len(self.history)))
-        else:
-            plt.plot(self.history)
-            plt.title(self.name)
-            plt.xlabel("Epoch")
-            # plt.ylabel(self.name)
-            plt.show()
+            ax.set_data(range(len(self.history)),self.history)
     @property
     def value(self):
         pass
@@ -66,7 +57,7 @@ class AverageMeter(Metric):
     def __init__(self, name="AverageMeter"):
         super(AverageMeter, self).__init__(name)
         self.reset()
-    def reset(self):
+    def _reset(self):
         self.sum = 0
         self.count = 0
     def _update(self, val:Union[int,float], n=1):
@@ -82,7 +73,7 @@ class AccuracyMeter(Metric):
         self.n_classes = n_classes
         self.correct_area = None
         self.reset()
-    def reset(self):
+    def _reset(self):
         self.correct = 0
         self.count = 0
         self._confusion_matrix = np.zeros((self.n_classes, self.n_classes), dtype=np.int32)
@@ -147,7 +138,7 @@ class IoUMeter(Metric):
         super(IoUMeter, self).__init__(name)
         self.n_classes = n_classes
         self.reset()
-    def reset(self):
+    def _reset(self):
         self.intersection = np.zeros(self.n_classes, dtype=np.int32)
         self.union = np.zeros(self.n_classes, dtype=np.int32)
     def _update(self, pred:Union[T.Tensor, np.ndarray], target:Union[T.Tensor, np.ndarray]):
@@ -184,7 +175,7 @@ class F1Meter(Metric):
         super(F1Meter, self).__init__(name)
         self.n_classes = n_classes
         self.reset()
-    def reset(self):
+    def _reset(self):
         self.tp = np.zeros(self.n_classes, dtype=np.int32)
         self.fp = np.zeros(self.n_classes, dtype=np.int32)
         self.fn = np.zeros(self.n_classes, dtype=np.int32)
@@ -241,6 +232,9 @@ class MetricList:
                 self.axes[i].set_title(metric.name)
                 self.lines.append(self.axes[i].plot([], [], label=metric.name)[0])
             metric.plot(metric.value,writer, global_step, ax=self.lines[i])
+            # Relim and rescale axes
+            self.axes[i].relim()
+            self.axes[i].autoscale_view()
         if not self.initialized_plots:
             self.initialized_plots = True
         self.fig.tight_layout()
@@ -257,25 +251,33 @@ class MetricList:
             if metric.name == key:
                 return metric
         raise KeyError(f"Metric with name {key} not found.")
+    def summary(self):
+        return self.to_dict()
     def __len__(self):
         return len(self.metrics)
     def __repr__(self):
         return f"MetricList with {len(self.metrics)} metrics."
-    def summary(self):
-        return self.to_dict()
+    def __str__(self):
+        return self.summary().__str__()
+    def __call__(self, *args: T.Tensor, **kwds: Any) -> Any:
+        return self.update(*args, **kwds)
+    @property
+    def value(self):
+        return sum(self.to_dict().values()) / len(self.metrics)
     
 
 if __name__ == "__main__":
     np.random.seed(0)
     n_classes = 10
     size = 100
+    batch_size = 10
     acc = AccuracyMeter(n_classes=n_classes)
     iou = IoUMeter(n_classes=n_classes)
     f1 = F1Meter(n_classes=n_classes)
     met_list = MetricList(metrics=[acc,iou,f1])
     for i in range(100):
-        test_pred = T.tensor(np.random.randint(0,n_classes,(1,size,size)))
-        test_target = T.tensor(np.random.randint(0,n_classes,(1,size,size)))
+        test_pred = T.tensor(np.random.randint(0,n_classes,(batch_size,1,size,size)))
+        test_target = T.tensor(np.random.randint(0,n_classes,(batch_size,1,size,size)))
         met_list.update(test_pred,test_target)
         met_list.plot()
         plt.pause(0.1)

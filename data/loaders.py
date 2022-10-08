@@ -293,8 +293,8 @@ class ADE20K(Dataset):
 
 
 class ADE20KSingleExample(Dataset):
-    def __init__(self,train:bool=True,img_size:int=520,transform:transforms=None,categorical:bool=False) -> None:
-        from ADE20KSegmentation import ADE20KSegmentation
+    def __init__(self,train:bool=True,img_size:int=520,transform:transforms=None,categorical:bool=False,index:int=0) -> None:
+        from data.ADE20KSegmentation import ADE20KSegmentation
         super().__init__()
         transform = transforms.Compose([
             transforms.ToTensor(),
@@ -335,7 +335,9 @@ class ADE20KSingleExample(Dataset):
             print(f'Class {c}:{self.class_names[c]} has {np.sum(label.numpy()==c)} pixels')
 
 def get_dataloader(dataset:Dataset,batch_size:int=1,shuffle:bool=False,num_workers:int=0,drop_last:bool=False) -> DataLoader:
-    return DataLoader(dataset,batch_size=batch_size,shuffle=shuffle,num_workers=num_workers,drop_last=drop_last)
+    
+    dloader = DataLoader(dataset,batch_size=batch_size,shuffle=shuffle,num_workers=num_workers,drop_last=drop_last)
+    return dloader
 
 def split_dataset(dataset:Dataset,split:list[float,float,float]=[0.9,0.05,0.05]) -> tuple[Dataset,Dataset,Dataset]:
     """ Split a dataset into train, val and test """

@@ -603,8 +603,8 @@ class UNet(nn.Module):
         self.decoder(outputs)     
     def forward(self,x):
         encoder_outputs = self.encoder(x)
-        x,x_s,attn_s = self.decoder(encoder_outputs)
-        return x,x_s,attn_s
+        y,y_s,attn_s = self.decoder(encoder_outputs)
+        return y,y_s,attn_s
         
     @T.no_grad()
     def sample(self,x):

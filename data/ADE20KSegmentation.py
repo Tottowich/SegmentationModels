@@ -5,9 +5,9 @@ import torch as T
 from PIL import Image, ImageOps, ImageFilter
 # import mxnet as mx
 # from mxnet import cpu
-import mxnet.ndarray as F
+# import mxnet.ndarray as F
 # from .base import VisionDataset
-from gluoncv.data.base import VisionDataset
+from torch.utils.data import Dataset
 
 __all__ = ['ms_batchify_fn', 'SegmentationDataset']
 """Pascal ADE20K Semantic Segmentation Dataset."""
@@ -16,7 +16,31 @@ from PIL import Image
 import numpy as np
 # import mxnet as mx
 from tqdm import tqdm
+class VisionDataset(Dataset):
+    """Base Dataset with directory checker.
 
+    Parameters
+    ----------
+    root : str
+        The root path of xxx.names, by default is '~/.mxnet/datasets/foo', where
+        `foo` is the name of the dataset.
+    """
+    def __init__(self, root):
+        if not os.path.isdir(os.path.expanduser(root)):
+            helper_msg = "{} is not a valid dir. Did you forget to initialize \
+                         datasets described in: \
+                         `https://cv.gluon.ai/build/examples_datasets/index.html`? \
+                         You need to initialize each dataset only once.".format(root)
+            raise OSError(helper_msg)
+
+    @property
+    def classes(self):
+        raise NotImplementedError
+
+    @property
+    def num_class(self):
+        """Number of categories."""
+        return len(self.classes)
 class SegmentationDataset(VisionDataset):
     """Segmentation Base Dataset"""
     # pylint: disable=abstract-method
@@ -251,7 +275,7 @@ class ADE20KSegmentation(SegmentationDataset):
         if self.categorical:
             mask = self.mask_to_categorical(mask)
             # Get channels of image not equal to zero through np.any
-        return T.from_numpy(mask)
+        return T.from_numpy(mask).permute(2, 0, 1)
         # return np.array(mask,dtype=np.int32)
         # return mx.nd.array(np.array(mask), mx.cpu(0)).astype('int32') - 1
     def mask_to_categorical(self, mask):

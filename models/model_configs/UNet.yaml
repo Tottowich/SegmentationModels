@@ -14,7 +14,7 @@
 #         num_heads: list[int] containing the number of heads of each UNetBlock.
 #         patch_size: list[int] containing the patch size of each UNetBlock.
 #         attn_drop: list[float] containing the dropout of each UNetBlock.
-num_classes: 4
+num_classes: 151
 steps: 4
 encoder:
   img_size: 512
