@@ -1,9 +1,10 @@
 import os
 from datetime import datetime as dt
-
+import logging
 import numpy as np
 import torch as T
 import torch.nn as nn
+import nvidia_smi
 from thop import clever_format, profile
 
 try:
@@ -43,9 +44,16 @@ def to0_1(x):
     """Converts a tensor to [0,1]"""
     return (x - x.min()) / (x.max() - x.min())
 
-
-import logging
-
+def view_vram(*args, **kwargs):
+    nvidia_smi.nvmlInit()
+    for i in range(nvidia_smi.nvmlDeviceGetCount()):
+        handle = nvidia_smi.nvmlDeviceGetHandleByIndex(i)
+        info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
+        print("Total: {}MB".format(info.total/1024/1024))
+        print("Used: {}MB".format(info.used/1024/1024))
+        print("Free: {}MB\n".format(info.free/1024/1024))
+    # Return the same arguments
+    return args, kwargs
 
 class ModelLogger(logging.Logger):
     """
@@ -55,19 +63,21 @@ class ModelLogger(logging.Logger):
         - the number of flops and parameters
         - the number of bytes of memory
     """
-    def __init__(self, model:nn.Module, level=logging.DEBUG,filename:str=None,visualize:bool=False) -> None:
-        super().__init__(model.__class__.__name__, level)
+    def __init__(self, model:nn.Module=None, level=logging.DEBUG,filename:str=None,visualize:bool=False) -> None:
+        name = model.__class__.__name__ if model is not None else "ModelLogger"
+        super().__init__(name, level)
         self.setLevel(level)
         if filename is None:
             self.handler = logging.StreamHandler()
         else:
             self.handler = logging.FileHandler(filename)
         self.handler.setLevel(level)
-        self.formatter = logging.Formatter('%(asctime)s :: %(name)s - %(levelname)s - %(message)s')
+        self.formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.handler.setFormatter(self.formatter)
         self.addHandler(self.handler)
         self.visualize = visualize
-        self.log_model(model)
+        if model is not None:
+            self.log_model(model)
     def log_model(self,model):
         self.log_memory(model)
         self.log_parameters(model)
@@ -89,8 +99,6 @@ class ModelLogger(logging.Logger):
         return pdf_path
 
     def flop_counter(self,model,x,**kwargs):
-        print(x.device)
-        print(model.device)
         if not isinstance(x,tuple):
             flops, params = profile(model, inputs=(x,),verbose=False)
         else:
@@ -108,3 +116,8 @@ class ModelLogger(logging.Logger):
         return dt.now().strftime("%Y-%m-%d %H:%M:%S")
     def timemark(self):
         self.info(f"{'='*20} {self.timestamp()} {'='*20}")
+    def epochmark(self,epoch):
+        self.info(f"{'='*20} Epoch {epoch} staring at {self.timestamp()}{'='*20}")
+    def blank(self):
+        # Black line without formatting
+        self.info("")

@@ -202,6 +202,9 @@ class ADE20K(Dataset):
     def __init__(self,train:bool=True,cache:bool=False,img_size:int=520,transform:transforms=None,categorical:bool=False,fraction:float=None) -> None:
         from data.ADE20KSegmentation import ADE20KSegmentation
         super().__init__()
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+        ])
 
         self.dataset = ADE20KSegmentation(split='train' if train else 'val', transform=transform,crop_size=img_size,categorical=categorical)
         self.fraction = fraction if fraction is not None else 1.0

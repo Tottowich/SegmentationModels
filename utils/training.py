@@ -7,6 +7,7 @@ import cv2
 import datetime as dt
 import os
 import time
+import copy
 from typing import Dict, List, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
@@ -105,6 +106,7 @@ class Trainer:
         self.resume = resume
         self.verbose = verbose
         self.metric_list = metric_list
+        T.backends.cudnn.benchmark = True
         if self.checkpoint is not None:
             self.load_checkpoint(checkpoint)
         if not self.resume and self.checkpoint is not None:
@@ -121,6 +123,10 @@ class Trainer:
         """
         Create all save paths.
         """
+        if os.path.exists(self.save_path):
+            # Add datetime to end of path.
+            self.save_path = self.save_path + '_' + dt.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+            print('Save path already exists, creating new save path: {}'.format(self.save_path))
         os.makedirs(self.save_path, exist_ok=True)
         os.makedirs(os.path.join(self.save_path, 'checkpoints'), exist_ok=True)
         self.checkpoint_dir = os.path.join(self.save_path, 'checkpoints')
@@ -138,8 +144,7 @@ class Trainer:
         """
         Create model info.
         """
-        self.logger = ModelLogger(self.model, filename=os.path.join(self.model_info_dir, 'model_info.txt'),visualize=True)
-        # Model is saved as PDF for now: TODO: Change to PNG or JPG if possible.
+        self.logger = ModelLogger(filename=os.path.join(self.model_info_dir, 'model_info.txt'),visualize=True)
         self.logger.info(self.model) # Print model to file.
         self.logger.timemark()
     def create_dataset_info(self):
@@ -164,8 +169,6 @@ class Trainer:
             img = img.astype(np.uint8)
             label = label.cpu().numpy()
             label = label.astype(np.uint8)
-            print(img.shape)
-            print(label.shape)
             # Join image and label image together.
             # Label image is 1 channel, so we need to make it 3 channels.
             label = np.stack((label, label, label), axis=2)
@@ -294,16 +297,15 @@ class Trainer:
         # Start training !
         for epoch in range(self.epoch, self.epochs):
             self.epoch = epoch
-            self.logger.info(f'Epoch {epoch + 1}/{self.epochs}')
-            self.logger.timemark()
+            self.logger.epochmark(f"{epoch + 1}/{self.epochs}")
             self.train_epoch()
             if epoch % self.val_interval == 0:
                 self.val_epoch() # Validate the model.
-                self.log_metrics() # Log metrics to csv file.
+                # self.log_metrics() # Log metrics to csv file.
             if epoch % self.save_interval == 0:
                 self.save_checkpoint(f'epoch_{epoch}', epoch, self.batch)
-            if self.val_loss < self.best_loss:
-                self.best_loss = self.val_loss
+            if self.val_loss[-1] < self.best_loss:
+                self.best_loss = self.val_loss[-1]
                 self.best_loss_epoch = epoch
                 save = True
                 self.save_checkpoint(f'epoch_{epoch}', epoch, self.batch, best=True)
@@ -314,6 +316,7 @@ class Trainer:
 
         self.logger.info('Training complete.')
         self.logger.timemark()
+        self.logger.log_model(self.model)
     def train_epoch(self):
         """
         Train the model for one epoch.
@@ -321,11 +324,7 @@ class Trainer:
         self.model.train()
         self.train_loss = 0
         for batch, (x, y) in enumerate(self.train_loader):
-            self.batch = batch
-            print(x.shape)
-            print(y.shape)
-            print(type(x))
-            print(type(y))
+            self.batch += 1 # Increment batch counter for logging.
             x = x.to(self.device)
             y = y.to(self.device)
             self.optimizer.zero_grad()
@@ -337,3 +336,25 @@ class Trainer:
         self.train_loss /= len(self.train_loader)
         self.logger.info(f'Train loss: {self.train_loss:.4f}')
         self.logger.timemark()
+    def val_epoch(self):
+        """
+        Validate the model.
+        """
+        self.model.eval()
+        val_loss = 0
+        with T.no_grad():
+            for batch, (x, y) in enumerate(self.val_loader):
+                x = x.to(self.device)
+                y = y.to(self.device)
+                y_pred,_,_ = self.model(x)
+                loss = self.criterion(y_pred, y.float())
+                val_loss += loss.item()
+                y_pred = self.model.select_prediction(y_pred)
+                y = self.model.select_prediction(y)
+                self.metric_list.update(y_pred, y)
+        val_loss /= len(self.val_loader)
+        self.val_loss.append(val_loss)
+        self.logger.info(f'Val loss: {val_loss:.4f} after {self.epoch + 1} epochs.')
+        self.val_acc = self.metric_list.value
+        self.logger.info(f'Val Metrics: {self.val_acc}')
+        # self.logger.timemark()

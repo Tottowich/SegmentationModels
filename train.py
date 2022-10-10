@@ -96,21 +96,21 @@ if __name__=="__main__":
     model = create_model(config_file)
     hyps = {"lr":1e-3,"weight_decay":1e-5}
     optimizer = create_optimizer(model,hyps)
+    dataset = create_dataset(img_size=model.img_size[0],cache=False,fraction=0.001)
     criterion = create_criterion()
-    dataset = create_dataset(img_size=512,cache=True,fraction=0.001,single_example=True)
     n_classes = dataset.num_classes
     trainer = create_trainer(
         model=model,
         optimizer=optimizer,
         criterion=criterion,
         dataset=dataset,
-        batch_size=4,
+        batch_size=8,
         num_workers=4,
         device="cuda" if T.cuda.is_available() else "cpu",
         save_path="./runs/UNet",
         hyper_parameters=hyps,
         wandb_run=None,
-        epochs=1,
+        epochs=100,
         log_interval=1,
         save_interval=5,
         save_best=True,
@@ -119,7 +119,7 @@ if __name__=="__main__":
         checkpoint=None,
         resume=None,
         verbose=True,
-        metric_list=MetricList([AccuracyMeter(n_classes=n_classes),IoUMeter(n_classes=n_classes),F1Meter(n_classes=n_classes)]),
+        metric_list=MetricList(metrics=[AccuracyMeter(n_classes=n_classes),IoUMeter(n_classes=n_classes),F1Meter(n_classes=n_classes)]),
     )
     trainer.train()
 

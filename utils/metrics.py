@@ -65,7 +65,7 @@ class AverageMeter(Metric):
         self.count += n
     @property
     def value(self):
-        return self.sum / self.count
+        return self.sum / self.count if self.count else 0
 
 class AccuracyMeter(Metric):
     def __init__(self, name="AccuracyMeter",n_classes:int=1):
@@ -84,9 +84,9 @@ class AccuracyMeter(Metric):
         Updating the metric will update the confusion matrix.
         """
         if isinstance(pred, T.Tensor):
-            pred = pred.detach().cpu().numpy()
+            pred = pred.detach().cpu().numpy().astype(np.int32)
         if isinstance(target, T.Tensor):
-            target = target.detach().cpu().numpy()
+            target = target.detach().cpu().numpy().astype(np.int32)
         assert pred.shape == target.shape, "Predictions and targets should have the same shape." # Shape should be (batch_size, H, W)
         self.correct_area = pred == target
         self.correct += np.sum(self.correct_area)
@@ -125,7 +125,7 @@ class AccuracyMeter(Metric):
             writer.add_figure("Confusion Matrix", fig, global_step)
     @property
     def value(self):
-        return self.correct/self.count
+        return self.correct/self.count if self.count else 0
     @property
     def accuracy(self):
         return self.value
@@ -158,13 +158,14 @@ class IoUMeter(Metric):
         return self.value
     @property
     def mean(self):
-        return np.mean(self.intersection / self.union)
+        self.m = np.mean(np.divide(self.intersection.astype(np.float32),self.union.astype(np.float32),where=self.union!=0,out=np.zeros_like(self.union,dtype=np.float32)))
+        return self.m
     @property
     def value(self):
-        return self.mean
+        return self.m if hasattr(self, "m") else self.mean
     @property
     def per_class(self):
-        return self.intersection / self.union
+        return np.divide(self.intersection.astype(np.float32),self.union.astype(np.float32),where=self.union!=0,out=np.zeros_like(self.union,dtype=np.float32))
     @property
     def class_i(self, i:int):
         return self.per_class[i]
@@ -197,13 +198,19 @@ class F1Meter(Metric):
         return self.value
     @property
     def mean(self):
-        return np.mean(self.tp / (self.tp + self.fp + self.fn))
+        s = self.tp + self.fp + self.fn
+        # print(s, "HELLO")
+        m = np.mean(np.divide(self.tp.astype(np.float32),s.astype(np.float32),where=s!=0,out=np.zeros_like(s,dtype=np.float32)))
+        # Replace NaNs with 0
+        self.m = m
+        return m
     @property
     def value(self):
-        return self.mean
+        return self.m if hasattr(self, "m") else self.mean
     @property
     def per_class(self):
-        return self.tp / (self.tp + self.fp + self.fn)
+        s = self.tp + self.fp + self.fn
+        return np.divide(self.tp.astype(np.float32),s.astype(np.float32),where=s!=0,out=np.zeros_like(s,dtype=np.float32))
     @property
     def class_i(self, i:int):
         return self.per_class[i]
@@ -224,7 +231,6 @@ class MetricList:
         # Create subplot from returned figures
         if not self.initialized_plots:
             self.fig, self.axes = plt.subplots(1, len(self.metrics), figsize=(len(self.metrics)*5, 5))
-        print(f"Plotting {len(self.metrics)} metrics.")
         if not self.initialized_plots:
             self.lines = []
         for i, metric in enumerate(self.metrics):
@@ -252,7 +258,12 @@ class MetricList:
                 return metric
         raise KeyError(f"Metric with name {key} not found.")
     def summary(self):
-        return self.to_dict()
+        # Printable summary of metrics
+        str_summary = ""
+        for metric in self.metrics:
+            str_summary += f"\n{metric.name}: {metric.value}"
+        
+        return str_summary
     def __len__(self):
         return len(self.metrics)
     def __repr__(self):

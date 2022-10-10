@@ -173,7 +173,7 @@ class Tester:
         unet_enc = UNetEncoder(config=config_file).to(self.device)
         x = self.ex_img
         print("Input shape: ", x.shape)
-        y,attn = unet_enc(x)
+        y = unet_enc(x)
         test_backprop(unet_enc, x)
         visualize_model(unet_enc, x)
         return x,unet_enc

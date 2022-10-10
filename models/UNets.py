@@ -1,7 +1,8 @@
+from base64 import encode
 from multiprocessing import context
 import sys
 import os
-from typing import Union, Tuple
+from typing import Union, Tuple, Callable, Optional, List
 if __name__=="__main__":
     sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from .Attention import ViTAttentionBlock
@@ -20,6 +21,34 @@ import yaml
 ViTAttentionBlock:
 Takes as input a tensor of shape (B, C, H, W) and returns a tensor of shape (B, C, H, W).
 """
+class StrToActivation(nn.Module):
+    def __init__(self,activation:str):
+        super().__init__()
+        if activation == "relu":
+            self.activation = nn.ReLU(inplace=True)
+        elif activation == "leaky_relu":
+            self.activation = nn.LeakyReLU(inplace=True)
+        elif activation == "tanh":
+            self.activation = nn.Tanh()
+        elif activation == "sigmoid":
+            self.activation = nn.Sigmoid()
+        elif activation == "softmax":
+            self.activation = nn.Softmax(dim=1)
+        elif activation == "identity":
+            self.activation = nn.Identity()
+        else:
+            raise Exception(f"Unknown activation: {activation}, available: relu, leaky_relu, tanh, sigmoid, softmax, identity")
+    def forward(self,x):
+        return self.activation(x)
+# StrToActivationDict = {
+#     "relu": nn.ReLU(inplace=True),
+#     "leaky_relu": nn.LeakyReLU(inplace=True),
+#     "tanh": nn.Tanh(),
+#     "sigmoid": nn.Sigmoid(),
+#     "softmax": nn.Softmax(dim=1),
+#     "identity": nn.Identity()
+# }
+
 class TransposeUpsample(nn.Module):
     def __init__(self, in_channels:int, out_channels:int, kernel_size:Tuple[tuple,int]=1, stride:Tuple[tuple,int]=1, padding:Tuple[tuple,int]=1, output_padding:Tuple[tuple,int]=0):
         """
@@ -41,7 +70,7 @@ class TransposeUpsample(nn.Module):
         x = self.relu(x)
         return x
 class Conv1x1(nn.Module):
-    def __init__(self, in_channels:int, out_channels:int,reps:int=1,activation:nn.Module=nn.ReLU,dropout:float=0.0):
+    def __init__(self, in_channels:int, out_channels:int,reps:int=1,activation:nn.Module=None,dropout:float=0.0):
         """
         Args:
             in_channels (int): Number of channels in the input image
@@ -53,10 +82,12 @@ class Conv1x1(nn.Module):
         """
         super().__init__()
         blocks = []
+        if activation is None:
+            activation = nn.Identity()
         for _ in range(reps):
             blocks.append(nn.Conv2d(in_channels, out_channels, 1,1,0))
             blocks.append(nn.BatchNorm2d(out_channels))
-            blocks.append(activation(inplace=True))
+            blocks.append(activation)
             blocks.append(nn.Dropout(dropout))
         self.conv = nn.Sequential(*blocks)
         # self.conv = nn.Conv2d(in_channels, out_channels, 1, 1, 0)
@@ -70,7 +101,7 @@ class Conv1x1(nn.Module):
         # x = self.activation(x)
         return x
 class Conv3x3(nn.Module):
-    def __init__(self, in_channels:int, out_channels:int,reps:int=1,activation:nn.Module=nn.ReLU,dropout:float=0.0):
+    def __init__(self, in_channels:int, out_channels:int,reps:int=1,activation:nn.Module=None,dropout:float=0.0,norm:bool=True):
         """
         Args:
             in_channels (int): Number of channels in the input image
@@ -81,10 +112,11 @@ class Conv3x3(nn.Module):
         """
         super().__init__()
         blocks = []
+
         for _ in range(reps):
             blocks.append(nn.Conv2d(in_channels, out_channels, 3, 1, 1))
-            blocks.append(nn.BatchNorm2d(out_channels))
-            blocks.append(activation(inplace=True) if not None else nn.Identity())
+            blocks.append(nn.BatchNorm2d(out_channels) if norm else nn.Identity())
+            blocks.append(activation if activation is not None else nn.Identity())
             blocks.append(nn.Dropout2d(dropout))
         self.conv = nn.Sequential(*blocks)
         # self.conv = nn.Conv2d(in_channels, out_channels, 3, 1, 1) # Same padding
@@ -301,10 +333,10 @@ class UNetEncoder(nn.Module):
         self.patch_size = self.config["patch_size"]
         self.attn_drop = self.config["attn_drop"]
         self.outputs = []
-        self.encoder = self.build_encoder()
         self.verbose = verbose
         if self.verbose:
-            self.logger = ModelLogger(self)
+            self.logger = ModelLogger()
+        self.encoder = self.build_encoder()
     def build_encoder(self):
         encoder = []
         output_img_size = self.img_size
@@ -359,6 +391,8 @@ class UNetEncoder(nn.Module):
             in_channels = out_channels
             if attention:
                 self.attention_layers.append(i)
+            if self.verbose:
+                self.logger.info(f"UNetBlock {i} out size: {output_img_size}")
         self.latent_size = output_img_size
         return nn.ModuleList(encoder) #nn.Sequential(*encoder)
     def read_config(self,config_file:str):
@@ -391,6 +425,12 @@ class UNetEncoder(nn.Module):
             self.outputs.append((x,attn))
             x_s.append(x)
         return x_s
+    @property
+    def test_input(self):
+        return T.rand(1, self.in_channels, *self.img_size)
+    @property
+    def device(self):
+        return next(self.parameters()).device
 
 class UpSampleBlock(nn.Module):
     def __init__(self,
@@ -423,6 +463,7 @@ class DecoderBlock(nn.Module):
                 attn_drop:float=0.0,
                 conv1x1:bool=1,
                 conv3x3:int=1,
+                activation:nn.Module=None,
                 ):
         super().__init__()
         self.in_channels = in_channels
@@ -437,11 +478,12 @@ class DecoderBlock(nn.Module):
         self.attn_drop = attn_drop
         self.upsample = UpSampleBlock(in_channels,in_channels)
         # self.attn_proj = Conv1x1()
-        self.conv_attn = Conv1x1(in_channels,in_channels,reps=conv1x1) if attention else nn.Identity()
+        # print(f"Activation Decoder: {activation}")
+        self.conv_attn = Conv1x1(in_channels,in_channels,reps=conv1x1,activation=activation) if attention else nn.Identity()
         # self.conv1x1 = Conv1x1(in_channels,out_channels,reps=conv1x1) if conv1x1 else nn.Identity()
-        self.conv1x1 = Conv1x1(in_channels,context_channels,reps=conv1x1) if conv1x1 else nn.Identity()
+        self.conv1x1 = Conv1x1(in_channels,context_channels,reps=conv1x1,activation=activation) if conv1x1 else nn.Identity()
         # self.conv3x3 = Conv3x3(in_channels,out_channels,reps=conv3x3) if conv3x3 else nn.Identity()
-        self.conv3x3 = Conv3x3(2*context_channels,out_channels,reps=conv3x3) if conv3x3 else nn.Identity()
+        self.conv3x3 = Conv3x3(2*context_channels,out_channels,reps=conv3x3,activation=activation) if conv3x3 else nn.Identity()
         # self.norm = nn.LayerNorm(out_channels) Maybe??
         if attention:
             self.mhca = self._build_attention() if attention else nn.Identity()
@@ -464,7 +506,7 @@ class DecoderBlock(nn.Module):
             )
     def forward(self,x_in,context):
         # print(f"\nDecoderBlock {DecoderBlock.block}: {x_in.shape} {context.shape}")
-        DecoderBlock.block += 1
+        # DecoderBlock.block += 1
         # print(f"DecoderBlock x_in: {x_in.shape}")
         # print(f"DecoderBlock context: {context.shape}")
         # # if self.attention:
@@ -488,17 +530,33 @@ class DecoderBlock(nn.Module):
         x = self.conv3x3(x)
         # print(f"DecoderBlock x post 3x3: {x.shape}")
         return x, attn
-
-        
+class OutputBlock(nn.Module):
+    def __init__(self,
+                in_channels:int,
+                out_channels:int,
+                conv1x1:bool=1,
+                conv3x3:int=1,
+                ):
+        super().__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.conv1x1 = Conv1x1(in_channels,out_channels,reps=conv1x1,activation=nn.Softmax(dim=1),norm=False) if conv1x1 else nn.Identity()
+        self.conv3x3 = Conv3x3(in_channels,out_channels,reps=conv3x3,activation=nn.Softmax(dim=1),norm=False) if conv3x3 else nn.Identity()
+    def forward(self,x):
+        x = self.conv1x1(x)
+        y = self.conv3x3(x)
+        return y
 class UNetDecoder(nn.Module):
     def __init__(self,
                 config:str,
                 latent_size:list=None,
-                verbose:bool=False,):
+                verbose:bool=False,
+                return_attention:bool=False,):
         super().__init__()
         self.attention_layers = [] #attention_layers
         self.config_file = config
         self.decoder_config = self.read_config(config)
+        self.return_attention = return_attention
         # self.decoder_depth = self.decoder_config["decoder_depth"]
         self.attention = self.decoder_config["attention"]
         self.conv1x1s = self.decoder_config["conv1x1"]
@@ -516,7 +574,7 @@ class UNetDecoder(nn.Module):
         self.decoder = self.build_decoder()
         self.verbose = verbose
         if self.verbose:
-            self.logger = ModelLogger(self)
+            self.logger = ModelLogger()
     def read_config(self,config_file):
         with open(config_file) as f:
             config = yaml.load(f,Loader=yaml.FullLoader)
@@ -544,7 +602,7 @@ class UNetDecoder(nn.Module):
         for i in range(self.steps):
             decoder.append(DecoderBlock(
                 in_channels=self.decoder_config["in_channels"][i],
-                out_channels=self.decoder_config["out_channels"][i] if i < self.steps-1 else self.num_classes,
+                out_channels=self.decoder_config["out_channels"][i] if i < self.steps else self.num_classes,
                 img_size=img_size,
                 context_channels=self.decoder_config["context_channels"][i],# if i < self.steps-1 else self.num_classes,
                 attention=self.decoder_config["attention"][i],
@@ -554,63 +612,66 @@ class UNetDecoder(nn.Module):
                 attn_drop=self.decoder_config["attn_drop"][i],
                 conv1x1=self.decoder_config["conv1x1"][i],
                 conv3x3=self.decoder_config["conv3x3"][i],
+                activation=StrToActivation(self.decoder_config["activation"][i]),
+                # activation=StrToActivationDict[self.decoder_config["activation"][i]]
                 ))
-            # print(f"DecoderBlock {i} in_channels: {self.decoder_config['in_channels'][i]}")
-            # print(f"DecoderBlock {i} out_channels: {self.decoder_config['out_channels'][i]}")
-            # print(f"DecoderBlock {i} img_size: {img_size}") 
-            # print(f"DecoderBlock {i} context_channels: {self.decoder_config['context_channels'][i]}")
-            # print(f"DecoderBlock {i} attention: {self.decoder_config['attention'][i]}")
-            # print(f"DecoderBlock {i} embed_dim: {self.decoder_config['embed_dim'][i]}")
-            # print(f"DecoderBlock {i} num_heads: {self.decoder_config['num_heads'][i]}")
-            # print(f"DecoderBlock {i} patch_size: {self.decoder_config['patch_size'][i]}")
-            # print(f"DecoderBlock {i} attn_drop: {self.decoder_config['attn_drop'][i]}")
-            # print(f"DecoderBlock {i} conv1x1: {self.decoder_config['conv1x1'][i]}")
-            # print(f"DecoderBlock {i} conv3x3: {self.decoder_config['conv3x3'][i]}\n")
             img_size = [img_size[0]*2,img_size[1]*2]
             self.attention_layers.append(i)
+        # Replace last layer with softmax if not already
+        decoder.append(OutputBlock(self.decoder_config["out_channels"][-1],self.num_classes,conv1x1=0,conv3x3=1))
         return nn.ModuleList(decoder)
-    def forward(self,encoder_ouputs:list[T.Tensor]):
-        x = encoder_ouputs.pop()
+    def forward(self,encoder_outputs:list[T.Tensor]):
+        x = encoder_outputs.pop()
         x_s = []
         attn_s = []
-        for i,layer in enumerate(self.decoder):
-            context = encoder_ouputs.pop()
+        for i,(layer,context) in enumerate(zip(self.decoder,reversed(encoder_outputs))):
+            encoder_outputs.pop()
+            # context = encoder_ouputs.pop()
             # print(f"UNetDecoder Input; x: {x.shape}, context: {context.shape}")
             if self.verbose:
                 self.logger.debug(f"DecoderBlockInput {i+1}; x: {x.shape}, context: {context.shape}")
             x, attn = layer(x,context)
-            x_s.append(x)
-            attn_s.append(attn)
+            x_s.append(x.detach().cpu().numpy())
+            attn_s.append(attn.detach().cpu().numpy() if attn is not None else None)
             # print(f"UNetDecoder Output; x: {x.shape}\n")
-        assert len(encoder_ouputs) == 0, "Not all encoder outputs have been used"
-        return x,x_s,attn_s # Return all decoder outputs
+        y = self.decoder[-1](x)
+        assert len(encoder_outputs) == 0, "Not all encoder outputs have been used"
+        return (y,attn_s,x_s) if self.return_attention else (y,None,None)  # 
+
 
 
 class UNet(nn.Module):
-    def __init__(self,config,device:T.device=T.device("cpu"),in_channels=3,verbose=False):
+    def __init__(self,config,device:T.device=T.device("cpu"),in_channels=3,verbose=False,func:Callable=None,return_attention:bool=False):
         super().__init__()
-        self.device = device
+        self._device = device
+        self.func = func
         self.encoder = UNetEncoder(config,in_channels=in_channels,verbose=verbose)
-        self.decoder = UNetDecoder(config,self.encoder.latent_size,verbose=verbose)
-        self.test_inp = T.randn(1,in_channels,*self.encoder.img_size)
-        if verbose:
-            self.logger = ModelLogger(self)
+        self.decoder = UNetDecoder(config,self.encoder.latent_size,verbose=verbose,return_attention=return_attention)
 
+        self.test_inp = T.randn(1,in_channels,*self.encoder.img_size,requires_grad=True)
+        if verbose:
+            self.logger = ModelLogger()
+    def select_prediction(self,outputs:list[T.Tensor]):
+        # For each pixel select the class with the highest probability
+        return T.argmax(outputs,dim=1)
     # @T.no_grad()
     def warmup(self):
-        self.to(self.device)
-        outputs = self.encoder(self.test_inp.to(self.device))
-        self.decoder(outputs)     
+        self.to(self._device)
+        self(self.test_inp.to(self._device))
+        # # outputs = self.encoder(self.test_inp.to(self._device))
+        # # self.decoder(outputs)     
     def forward(self,x):
         encoder_outputs = self.encoder(x)
-        y,y_s,attn_s = self.decoder(encoder_outputs)
-        return y,y_s,attn_s
-        
+        if self.func is not None:
+            encoder_outputs = self.func(encoder_outputs)
+        y,attn_s,y_s = self.decoder(encoder_outputs)
+        return y,attn_s,y_s
     @T.no_grad()
     def sample(self,x):
         encoder_outputs = self.encoder(x)
         x,x_s,attn_s = self.decoder(encoder_outputs)
         return x
+    @T.no_grad()
     def get_latent(self,x):
         return self.encoder(x)[-1]
     @property
@@ -618,5 +679,11 @@ class UNet(nn.Module):
         return self.encoder.latent_size
     @property
     def test_input(self):
-        return self.test_inp.to(self.device)
+        return self.test_inp.to(self._device)
+    @property
+    def num_classes(self):
+        return self.decoder.num_classes
+    @property
+    def img_size(self):
+        return self.encoder.img_size
     
