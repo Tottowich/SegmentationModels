@@ -422,7 +422,7 @@ class UNetEncoder(nn.Module):
             if self.verbose:
                 self.logger.debug(f"EncoderBlock {i+1}; x: {x.shape}")
             x, attn = block(x)
-            self.outputs.append((x,attn))
+            # self.outputs.append((x,attn))
             x_s.append(x)
         return x_s
     @property
@@ -643,12 +643,12 @@ class UNetDecoder(nn.Module):
 class UNet(nn.Module):
     def __init__(self,config,device:T.device=T.device("cpu"),in_channels=3,verbose=False,func:Callable=None,return_attention:bool=False):
         super().__init__()
+        self.in_channels = in_channels
         self._device = device
         self.func = func
         self.encoder = UNetEncoder(config,in_channels=in_channels,verbose=verbose)
         self.decoder = UNetDecoder(config,self.encoder.latent_size,verbose=verbose,return_attention=return_attention)
 
-        self.test_inp = T.randn(1,in_channels,*self.encoder.img_size,requires_grad=True)
         if verbose:
             self.logger = ModelLogger()
     def select_prediction(self,outputs:list[T.Tensor]):
@@ -656,8 +656,10 @@ class UNet(nn.Module):
         return T.argmax(outputs,dim=1)
     # @T.no_grad()
     def warmup(self):
+        self.test_inp = T.randn(1,self.in_channels,*self.encoder.img_size,requires_grad=True)
         self.to(self._device)
         self(self.test_inp.to(self._device))
+        self.test_inp.to("cpu") # Move back to cpu if not already
         # # outputs = self.encoder(self.test_inp.to(self._device))
         # # self.decoder(outputs)     
     def forward(self,x):
