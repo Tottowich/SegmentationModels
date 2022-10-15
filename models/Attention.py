@@ -1,7 +1,7 @@
-from multiprocessing import context
 import sys
 import os
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+if __name__=="__main__":
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from utils.visualizations import visualize_attention_map
 from utils.helper import to_2tuple
 import math

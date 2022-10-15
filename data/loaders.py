@@ -1,7 +1,8 @@
 import os, sys
 from regex import P
 # Add the parent directory to the path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if __name__=="__main__":
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tqdm import tqdm
 from PIL import Image
 import numpy as np
@@ -296,7 +297,7 @@ class ADE20K(Dataset):
 
 
 class ADE20KSingleExample(Dataset):
-    def __init__(self,train:bool=True,img_size:int=520,transform:transforms=None,categorical:bool=False,index:int=0) -> None:
+    def __init__(self,train:bool=True,img_size:int=520,transform:transforms=None,fraction:float=1.0,categorical:bool=False,index:int=0) -> None:
         from data.ADE20KSegmentation import ADE20KSegmentation
         super().__init__()
         transform = transforms.Compose([
@@ -306,15 +307,16 @@ class ADE20KSingleExample(Dataset):
         self.dataset = ADE20KSegmentation(split='train' if train else 'val', transform=transform,crop_size=img_size,categorical=categorical)
         self._num_classes = self.dataset.num_class
         self.example = self.dataset[index]
+        self.dataset = [self.example for _ in range(int(1000*fraction))]
         self.class_names = ADE20KSegmentation.CLASSES
     def __len__(self) -> int:
-        return 1
+        return len(self.dataset)
 
     @property
     def num_classes(self) -> int:
         return self._num_classes
     def __getitem__(self, index: int) -> tuple[T.Tensor,T.Tensor]:
-        return self.example
+        return self.dataset[index]
     def __iter__(self):
         return iter(self.example)
     def __next__(self):

@@ -16,6 +16,7 @@
 #         attn_drop: list[float] containing the dropout of each UNetBlock.
 num_classes: 151
 steps: 4
+in_channels: 3
 encoder:
   img_size: 256
   depth: [3,2,1,1]
@@ -36,7 +37,7 @@ encoder:
 decoder:
   in_channels: [512, 256, 128, 64]
   out_channels: [256, 128, 64, 32]
-  attention: [False,False,True,False] #[True,True,True,True]
+  attention: [True,True,False,False] #[True,True,True,True]
   embed_dim: 768
   num_heads: 8
   patch_size: [8,8,16,16]

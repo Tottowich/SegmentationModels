@@ -8,8 +8,9 @@ from colorama import Fore, Back, Style
 from PIL import Image
 from copy import copy
 from torch.cuda import empty_cache
-os.environ["PATH"] += os.pathsep + 'C:/Program Files/Graphviz/bin/'
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+if __name__=="__main__":
+    os.environ["PATH"] += os.pathsep + 'C:/Program Files/Graphviz/bin/'
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from models.UNets import *
 from models.Attention import *
 from testing_utils import visualize_model

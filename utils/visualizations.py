@@ -8,6 +8,7 @@ from mpl_toolkits.axes_grid1 import ImageGrid
 from .helper import to0_1
 
 
+
 def visualize_attention_map(attention_map, image, save_path=None):
     """
     Visualize the attention map on top of the image

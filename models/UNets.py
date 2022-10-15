@@ -1,17 +1,15 @@
-from base64 import encode
-from multiprocessing import context
+from json import encoder
 import sys
 import os
+from typing import NamedTuple
 from typing import Union, Tuple, Callable, Optional, List
-if __name__=="__main__":
-    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+# if __name__=="__main__":
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from .Attention import ViTAttentionBlock
 from .Attention import CrossAttentionBlock
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from utils.visualizations import visualize_attention_map
 from utils.helper import to_2tuple
 from utils.helper import ModelLogger
-import math
 import numpy as np
 import torch as T
 import torch.nn as nn
@@ -295,43 +293,29 @@ class UNetEncoder(nn.Module):
         patch_size: list[int] containing the patch size of each UNetBlock.
         attn_drop: list[float] containing the dropout of each UNetBlock.
     """
-    def __init__(self, config:Union[dict,str],in_channels:int=3,verbose:bool=False):
+    def __init__(self, config:Union[dict,str],verbose:bool=False):
         super().__init__()
         if isinstance(config,dict):
-            assert "depth" in config, "Depth for each block must be specified"
-            assert "kernel_size" in config, "Kernel size must be specified"
-            assert "out_channels" in config, "Out channels must be specified"
-            assert "stride" in config, "Stride must be specified"
-            assert "padding" in config, "Padding must be specified"
-            assert "norms" in config, "Norms must be specified"
-            assert "acts" in config, "Acts must be specified"
-            assert "pool" in config, "Pool must be specified"
-            assert "dropout" in config, "Dropout must be specified"
-            assert "attention" in config, "Attention must be specified"
-            assert "img_size" in config, "Image size must be specified"
-            assert "embed_dim" in config, "Embedding dimension must be specified"
-            assert "num_heads" in config, "Number of heads must be specified"
-            assert "patch_size" in config, "Patch size must be specified"
-            assert "attn_drop" in config, "Attention dropout must be specified"
-            self.config = config
+            self.in_channels = config.get("in_channels",3)
+            self._config = config["encoder"]
+
         else:
-            self.config = self.read_config(config)
-        self.in_channels = in_channels
-        self.depth = self.config["depth"]
-        self.kernel_size = self.config["kernel_size"]
-        self.out_channels = self.config["out_channels"]
-        self.stride = self.config["stride"]
-        self.padding = self.config["padding"]
-        self.norms = self.config["norms"]
-        self.acts = self.config["acts"]
-        self.pool = self.config["pool"]
-        self.dropout = self.config["dropout"]
-        self.attention = self.config["attention"]
-        self.img_size = to_2tuple(self.config["img_size"])
-        self.embed_dim = self.config["embed_dim"]
-        self.num_heads = self.config["num_heads"]
-        self.patch_size = self.config["patch_size"]
-        self.attn_drop = self.config["attn_drop"]
+            self._config = self.read_config(config)
+        self.depth = self._config["depth"]
+        self.kernel_size = self._config["kernel_size"]
+        self.out_channels = self._config["out_channels"]
+        self.stride = self._config["stride"]
+        self.padding = self._config["padding"]
+        self.norms = self._config["norms"]
+        self.acts = self._config["acts"]
+        self.pool = self._config["pool"]
+        self.dropout = self._config["dropout"]
+        self.attention = self._config["attention"]
+        self.img_size = to_2tuple(self._config["img_size"])[:2]
+        self.embed_dim = self._config["embed_dim"]
+        self.num_heads = self._config["num_heads"]
+        self.patch_size = self._config["patch_size"]
+        self.attn_drop = self._config["attn_drop"]
         self.outputs = []
         self.verbose = verbose
         if self.verbose:
@@ -398,21 +382,22 @@ class UNetEncoder(nn.Module):
     def read_config(self,config_file:str):
         with open(config_file) as f:
             config = yaml.load(f,Loader=yaml.FullLoader)
-        self.steps = config["steps"]
+        self._steps = config["steps"]
+        self.in_channels = config["in_channels"]
         encoder_config = config["encoder"]
         for key,item in encoder_config.items():
-            if key in ["depth","kernel_size","out_channels","stride","padding","norms","acts","pool","dropout","attention","embed_dim","num_heads","patch_size","attn_drop"]:
-                if not isinstance(item,list):
-                    encoder_config[key] = [item]*self.steps
-                else:
-                    if len(item) != self.steps:
-                        # print(f"Number of \'{key}\' provided does not match encoder depth. Setting to default.")
-                        # Extent by last value if not enough
-                        if len(item) < self.steps:
-                            encoder_config[key] = item + [item[-1]]*(self.steps-len(item))
-                        else:
-                            encoder_config[key] = item[:self.steps]
-                # print(f"Encoder config: {key} = {encoder_config[key]}")
+            # if key in ["depth","kernel_size","out_channels","stride","padding","norms","acts","pool","dropout","attention","embed_dim","num_heads","patch_size","attn_drop"]:
+            if not isinstance(item,list):
+                encoder_config[key] = [item]*self._steps
+            else:
+                if len(item) != self._steps:
+                    # print(f"Number of \'{key}\' provided does not match encoder depth. Setting to default.")
+                    # Extent by last value if not enough
+                    if len(item) < self._steps:
+                        encoder_config[key] = item + [item[-1]]*(self._steps-len(item))
+                    else:
+                        encoder_config[key] = item[:self._steps]
+        encoder_config["in_channels"] = self.in_channels
         return encoder_config
     def forward(self, x):
         # x = self.encoder(x)
@@ -427,11 +412,22 @@ class UNetEncoder(nn.Module):
         return x_s
     @property
     def test_input(self):
-        return T.rand(1, self.in_channels, *self.img_size)
+        return T.rand(1, self.in_channels, *self.img_size[:2])
     @property
     def device(self):
         return next(self.parameters()).device
-
+    @property
+    def encoder_config(self)->dict:
+        return self._config
+    @property
+    def encoder_depth(self)->int:
+        return self.depth
+    @property
+    def steps(self)->int:
+        if hasattr(self,"_steps"):
+            return self._steps
+        else:
+            return len(self.encoder)
 class UpSampleBlock(nn.Module):
     def __init__(self,
                 in_channels:int,
@@ -555,22 +551,28 @@ class UNetDecoder(nn.Module):
         super().__init__()
         self.attention_layers = [] #attention_layers
         self.config_file = config
-        self.decoder_config = self.read_config(config)
-        self.return_attention = return_attention
+        if isinstance(config,str):
+            self._decoder_config = self.read_config(config)
+        else:
+            assert isinstance(config,dict), "Config must be a dict or a path to a yaml file"
+            self.num_classes = config["num_classes"]
+            self.steps = config["steps"]
+            self._decoder_config = config["decoder"]
+        self._return_attention = return_attention
         # self.decoder_depth = self.decoder_config["decoder_depth"]
-        self.attention = self.decoder_config["attention"]
-        self.conv1x1s = self.decoder_config["conv1x1"]
-        self.conv3x3s = self.decoder_config["conv3x3"]
-        self.embed_dim = self.decoder_config["embed_dim"]
-        self.num_heads = self.decoder_config["num_heads"]
-        self.patch_size = self.decoder_config["patch_size"]
-        self.attn_drop = self.decoder_config["attn_drop"]
-        self.in_channels = self.decoder_config["in_channels"]
-        self.out_channels = self.decoder_config["out_channels"]
+        self.attention = self._decoder_config["attention"]
+        self.conv1x1s = self._decoder_config["conv1x1"]
+        self.conv3x3s = self._decoder_config["conv3x3"]
+        self.embed_dim = self._decoder_config["embed_dim"]
+        self.num_heads = self._decoder_config["num_heads"]
+        self.patch_size = self._decoder_config["patch_size"]
+        self.attn_drop = self._decoder_config["attn_drop"]
+        self.in_channels = self._decoder_config["in_channels"]
+        self.out_channels = self._decoder_config["out_channels"]
         self.latent_size = latent_size
         # self.img_size = self.decoder_config["img_size"]
         # self.context_size = self.decoder_config["context_size"]
-        self.context_channels = self.decoder_config["context_channels"]
+        self.context_channels = self._decoder_config["context_channels"]
         self.decoder = self.build_decoder()
         self.verbose = verbose
         if self.verbose:
@@ -601,24 +603,24 @@ class UNetDecoder(nn.Module):
         img_size = self.latent_size
         for i in range(self.steps):
             decoder.append(DecoderBlock(
-                in_channels=self.decoder_config["in_channels"][i],
-                out_channels=self.decoder_config["out_channels"][i] if i < self.steps else self.num_classes,
+                in_channels=self._decoder_config["in_channels"][i],
+                out_channels=self._decoder_config["out_channels"][i] if i < self.steps else self.num_classes,
                 img_size=img_size,
-                context_channels=self.decoder_config["context_channels"][i],# if i < self.steps-1 else self.num_classes,
-                attention=self.decoder_config["attention"][i],
-                embed_dim=self.decoder_config["embed_dim"][i],
-                num_heads=self.decoder_config["num_heads"][i],
-                patch_size=self.decoder_config["patch_size"][i],
-                attn_drop=self.decoder_config["attn_drop"][i],
-                conv1x1=self.decoder_config["conv1x1"][i],
-                conv3x3=self.decoder_config["conv3x3"][i],
-                activation=StrToActivation(self.decoder_config["activation"][i]),
+                context_channels=self._decoder_config["context_channels"][i],# if i < self.steps-1 else self.num_classes,
+                attention=self._decoder_config["attention"][i],
+                embed_dim=self._decoder_config["embed_dim"][i],
+                num_heads=self._decoder_config["num_heads"][i],
+                patch_size=self._decoder_config["patch_size"][i],
+                attn_drop=self._decoder_config["attn_drop"][i],
+                conv1x1=self._decoder_config["conv1x1"][i],
+                conv3x3=self._decoder_config["conv3x3"][i],
+                activation=StrToActivation(self._decoder_config["activation"][i]),
                 # activation=StrToActivationDict[self.decoder_config["activation"][i]]
                 ))
             img_size = [img_size[0]*2,img_size[1]*2]
             self.attention_layers.append(i)
         # Replace last layer with softmax if not already
-        decoder.append(OutputBlock(self.decoder_config["out_channels"][-1],self.num_classes,conv1x1=0,conv3x3=1))
+        decoder.append(OutputBlock(self._decoder_config["out_channels"][-1],self.num_classes,conv1x1=0,conv3x3=1))
         return nn.ModuleList(decoder)
     def forward(self,encoder_outputs:list[T.Tensor]):
         x = encoder_outputs.pop()
@@ -626,66 +628,136 @@ class UNetDecoder(nn.Module):
         attn_s = []
         for i,(layer,context) in enumerate(zip(self.decoder,reversed(encoder_outputs))):
             encoder_outputs.pop()
-            # context = encoder_ouputs.pop()
-            # print(f"UNetDecoder Input; x: {x.shape}, context: {context.shape}")
             if self.verbose:
                 self.logger.debug(f"DecoderBlockInput {i+1}; x: {x.shape}, context: {context.shape}")
             x, attn = layer(x,context)
-            x_s.append(x.detach().cpu().numpy())
-            attn_s.append(attn.detach().cpu().numpy() if attn is not None else None)
-            # print(f"UNetDecoder Output; x: {x.shape}\n")
+            if self._return_attention:
+                x_s.append(x.detach().cpu().numpy())
+                attn_s.append(attn.detach().cpu().numpy() if attn is not None else None)
         y = self.decoder[-1](x)
         assert len(encoder_outputs) == 0, "Not all encoder outputs have been used"
-        return (y,attn_s,x_s) if self.return_attention else (y,None,None)  # 
+        return (y,attn_s,x_s) if self._return_attention else (y,None,None)  #
+    @property
+    def decoder_config(self):
+        return self._decoder_config
+    @property
+    def device(self):
+        return next(self.parameters()).device
 
 
-
+# output_type = NamedTuple("UNetOutput", [("y",T.Tensor),("attn",Optional[T.Tensor]),("y_s",Optional[T.Tensor])])
 class UNet(nn.Module):
-    def __init__(self,config,device:T.device=T.device("cpu"),in_channels=3,verbose=False,func:Callable=None,return_attention:bool=False):
+    def __init__(self,config:Union[str,dict]=None,device:T.device=None,verbose:bool=False,func:Callable=None,return_attention:bool=False,checkpoint:str=None):
         super().__init__()
-        self.in_channels = in_channels
-        self._device = device
         self.func = func
-        self.encoder = UNetEncoder(config,in_channels=in_channels,verbose=verbose)
-        self.decoder = UNetDecoder(config,self.encoder.latent_size,verbose=verbose,return_attention=return_attention)
+        self.return_attention = return_attention
+        self.verbose = verbose
 
+        if checkpoint is None:
+            self.build_unet(config=config)
+        else:
+            assert config is None, "Beware that config is ignored when loading from checkpoint. Use config to build new model."
+            self.load(checkpoint)
+        # Named type for output list of tensors
+        # self.output_type = NamedTuple("UNetOutput", [("y",T.Tensor),("attn",Optional[T.Tensor]),("y_s",Optional[T.Tensor])])
+        if device is not None:
+            self.to(device)
         if verbose:
             self.logger = ModelLogger()
+    def build_unet(self,config:Union[str,dict]):
+        """
+        Build UNet from config file or dict.
+        """
+        self.encoder:UNetEncoder = UNetEncoder(config,verbose=self.verbose)
+        self.decoder:UNetDecoder = UNetDecoder(config,self.encoder.latent_size,verbose=self.verbose,return_attention=self.return_attention)
+    def load(self,path:str):
+        """Load model from checkpoint."""
+        checkpoint = T.load(path)
+        if isinstance(checkpoint,dict):
+            config = checkpoint['model_config']
+            print('Loading model from checkpoint: {}'.format(path))
+            self.build_unet(config) # When loading a previous
+            self.load_state_dict(checkpoint['model'])
+        else:
+            raise ValueError("Checkpoint is not a dict. Cannot load model.")
+        return checkpoint
     def select_prediction(self,outputs:list[T.Tensor]):
         # For each pixel select the class with the highest probability
         return T.argmax(outputs,dim=1)
     # @T.no_grad()
-    def warmup(self):
-        self.test_inp = T.randn(1,self.in_channels,*self.encoder.img_size,requires_grad=True)
-        self.to(self._device)
-        self(self.test_inp.to(self._device))
-        self.test_inp.to("cpu") # Move back to cpu if not already
-        # # outputs = self.encoder(self.test_inp.to(self._device))
-        # # self.decoder(outputs)     
-    def forward(self,x):
+    def warmup(self)->None:
+        """Warmup the model by running a forward pass with random data."""
+        self(self.test_input.to(self.encoder.device))
+
+    # def forward(self,x:T.Tensor)->output_type:
+    def forward(self,x:T.Tensor)->tuple[T.Tensor,Optional[T.Tensor],Optional[T.Tensor]]:
+        """
+        Forward pass of the model.
+
+        If return_attention is True, the attention maps are returned as well as the output data at each decoder step.
+        """
         encoder_outputs = self.encoder(x)
         if self.func is not None:
             encoder_outputs = self.func(encoder_outputs)
         y,attn_s,y_s = self.decoder(encoder_outputs)
+        return  y,attn_s,y_s
+    @property
+    def config(self)->tuple[dict]:
+        config = {}
+        config["num_classes"] = self.num_classes
+        config["in_channels"] = self.encoder.in_channels
+        config["steps"] = self.encoder.steps
+        config["encoder"] = self.encoder.encoder_config
+        config["decoder"] = self.decoder.decoder_config
+        return config
+    @property
+    def device(self)->T.device:
+        return next(self.parameters()).device
+    @T.no_grad()
+    def predict(self,x:T.Tensor)->tuple[T.Tensor,list[T.Tensor],list[T.Tensor]]:
+        """
+        Predict the output of the model.
+        """
+        x = x.to(self.device)
+        y,attn_s,y_s = self.sample(x)
+        y = self.select_prediction(y)
         return y,attn_s,y_s
     @T.no_grad()
-    def sample(self,x):
-        encoder_outputs = self.encoder(x)
-        x,x_s,attn_s = self.decoder(encoder_outputs)
-        return x
+    def sample(self,x:T.Tensor)->tuple[T.Tensor,list[T.Tensor],list[T.Tensor]]:
+        # Use torch mixed precision
+        if self.device == "cuda":
+            with T.cuda.amp.autocast():
+                y,attn_s,y_s = self(x)
+        else:
+            y,attn_s,y_s = self(x)
+        return y,attn_s,y_s
     @T.no_grad()
-    def get_latent(self,x):
+    def get_latent(self,x:T.Tensor)->T.Tensor:
         return self.encoder(x)[-1]
+    @T.no_grad()
+    def get_attentions(self,x:T.Tensor)->list[T.Tensor]:
+        encoder_outputs = self.encoder(x)
+        return self.decoder(encoder_outputs)[1]
     @property
-    def latent_size(self):
+    def latent_size(self)->tuple[int]:
         return self.encoder.latent_size
     @property
-    def test_input(self):
-        return self.test_inp.to(self._device)
+    def test_input(self)->T.Tensor:
+        if not hasattr(self,"test_inp"):
+            self.test_inp = T.randn(1,self.encoder.in_channels,*self.encoder.img_size[:2],requires_grad=True,device=self.encoder.device)
+        else:
+            self.test_inp = self.test_inp.to(self.device)
+        return self.test_inp
     @property
-    def num_classes(self):
+    def num_classes(self)->int:
         return self.decoder.num_classes
     @property
-    def img_size(self):
+    def img_size(self)->tuple[int]:
         return self.encoder.img_size
-    
+    @property
+    def num_parameters(self)->int:
+        return sum(p.numel() for p in self.parameters() if p.requires_grad)
+    @property
+    def num_layers(self)->int:
+        return len(self.encoder) + len(self.decoder)
+        

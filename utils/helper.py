@@ -5,6 +5,8 @@ import numpy as np
 import torch as T
 import torch.nn as nn
 import nvidia_smi
+import psutil
+from typing import Dict, List, Tuple, Union
 from thop import clever_format, profile
 
 try:
@@ -12,6 +14,90 @@ try:
 except ImportError:
     print("torchviz is not installed")
 
+
+def view_vram(verbose:bool=False,percentage:bool=False)->dict:
+    """
+    Returns a dictionary with the total, used and free VRAM in MB, the keys are the device names.
+    """
+    nvidia_smi.nvmlInit()
+    devices = {}
+    assert nvidia_smi.nvmlDeviceGetCount() > 0, "No Nvidia-GPU found"
+    for i in range(nvidia_smi.nvmlDeviceGetCount()):
+        print(i)
+        # Get device names
+        handle = nvidia_smi.nvmlDeviceGetHandleByIndex(i)
+        info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
+        name = nvidia_smi.nvmlDeviceGetName(handle).decode("utf-8")
+        if not percentage:
+            devices[name] = {"total":info.total/1024/1024,
+                            "used":info.used/1024/1024,
+                            "free":info.free/1024/1024}
+        else:
+            devices[name] = {"total":100,
+                            "used":info.used/info.total*100,
+                            "free":info.free/info.total*100}
+        if verbose:
+            print(f"Device {name}:")
+            print(f"Total: {devices[name]['total']}MB")
+            print(f"Used: {devices[name]['used']}MB")
+            print(f"Free: {devices[name]['free']}MB")
+    return devices
+def view_ram(verbose=False,percentage=False):
+    """Returns the total, used and free RAM in MB"""
+    mem = psutil.virtual_memory()
+    if not percentage:
+        usage = {"total":mem.total/1024/1024,
+                "used":mem.used/1024/1024,
+                "free":mem.free/1024/1024}
+    else:
+        usage = {"total":100,
+                "used":mem.used/mem.total*100,
+                "free":mem.free/mem.total*100}
+    if verbose:
+        print(f"Total: {usage['total']}MB")
+        print(f"Used: {usage['used']}MB")
+        print(f"Free: {usage['free']}MB")
+    return usage
+def cpu_usage(verbose=False):
+    """Returns the total, used and free CPU in %"""
+    cpu = psutil.cpu_percent()
+    return cpu
+def ram_usage():
+    mem = psutil.virtual_memory()
+    return mem.used/mem.total*100
+def gpu_usage(verbose=False):
+    """Returns the total, used and free GPU in %"""
+    # Using nvidia_smi
+    nvidia_smi.nvmlInit()
+    assert nvidia_smi.nvmlDeviceGetCount() > 0, "No Nvidia-GPU found"
+    usage = {}
+    for i in range(nvidia_smi.nvmlDeviceGetCount()):
+        handle = nvidia_smi.nvmlDeviceGetHandleByIndex(i)
+        # Get GPU name and utilization
+        name = nvidia_smi.nvmlDeviceGetName(handle).decode("utf-8") 
+        util = nvidia_smi.nvmlDeviceGetUtilizationRates(handle)
+        if verbose:
+            print(f"Device {name}:")
+            print(f"Usage: {util.gpu}%")
+            print(f"Memory: {util.memory}%")
+        usage[name] = {"usage":util.gpu,
+                        "memory":util.memory}
+    return usage
+def num_cpu():
+    return psutil.cpu_count()
+def num_gpu():
+    nvidia_smi.nvmlInit()
+    return nvidia_smi.nvmlDeviceGetCount()
+def gpu_names():
+    """Returns the names of the GPUs"""
+    nvidia_smi.nvmlInit()
+    assert nvidia_smi.nvmlDeviceGetCount() > 0, "No Nvidia-GPU found"
+    names = []
+    for i in range(nvidia_smi.nvmlDeviceGetCount()):
+        handle = nvidia_smi.nvmlDeviceGetHandleByIndex(i)
+        name = nvidia_smi.nvmlDeviceGetName(handle).decode("utf-8") 
+        names.append(name)
+    return names
 def visualize_model(model,x):
     assert isinstance(model, T.nn.Module), "Model is not a torch.nn.Module"
     assert "make_dot" in globals(), "torchviz is not installed"
@@ -44,16 +130,16 @@ def to0_1(x):
     """Converts a tensor to [0,1]"""
     return (x - x.min()) / (x.max() - x.min())
 
-def view_vram(*args, **kwargs):
-    nvidia_smi.nvmlInit()
-    for i in range(nvidia_smi.nvmlDeviceGetCount()):
-        handle = nvidia_smi.nvmlDeviceGetHandleByIndex(i)
-        info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
-        print("Total: {}MB".format(info.total/1024/1024))
-        print("Used: {}MB".format(info.used/1024/1024))
-        print("Free: {}MB\n".format(info.free/1024/1024))
-    # Return the same arguments
-    return args, kwargs
+# def view_vram(*args, **kwargs):
+#     nvidia_smi.nvmlInit()
+#     for i in range(nvidia_smi.nvmlDeviceGetCount()):
+#         handle = nvidia_smi.nvmlDeviceGetHandleByIndex(i)
+#         info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
+#         print("Total: {}MB".format(info.total/1024/1024))
+#         print("Used: {}MB".format(info.used/1024/1024))
+#         print("Free: {}MB\n".format(info.free/1024/1024))
+#     # Return the same arguments
+#     return args, kwargs
 
 class ModelLogger(logging.Logger):
     """
@@ -79,11 +165,11 @@ class ModelLogger(logging.Logger):
         if model is not None:
             self.log_model(model)
     def log_model(self,model):
-        self.log_memory(model)
-        self.log_parameters(model)
         if self.visualize:
             os.environ["PATH"] += os.pathsep + 'C:/Program Files/Graphviz/bin/'
             self.plot_model(model,model.test_input)
+        self.log_memory(model)
+        self.log_parameters(model)
     def log_parameters(self,model):
         self.flop_counter(model,model.test_input)
     def log_memory(self,model):

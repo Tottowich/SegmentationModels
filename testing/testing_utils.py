@@ -4,7 +4,8 @@ import sys
 import torch as T
 import traceback
 from colorama import Fore, Back, Style
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+if __name__ == "__main__":
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 # import timeit
 import time
 from thop import profile, clever_format
