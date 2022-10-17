@@ -12,6 +12,9 @@ import torch.nn.functional as F
 from typing import Optional, Tuple, Union
 
 class ViTPositionalEmbedding(nn.Module):
+    """
+    Create a patch embedding from a patch size.
+    """
     def __init__(self,embed_dim,num_patches):
         super().__init__()
         self.pos_embed = nn.Parameter(T.zeros(1, num_patches, embed_dim))
@@ -124,6 +127,9 @@ class ViTAttentionBlock(nn.Module):
 
 
 class UpSampleBlock(nn.Module):
+    """
+    Block in the pipeline which upsamples the image.
+    """
     def __init__(self,
                 in_chans:int,
                 out_chans:int,
@@ -220,26 +226,3 @@ class CrossAttentionBlock(nn.Module):
         x = self.up_sample(x) # x shape: (bs, C_context, H*scale, W*scale)
         x = T.mul(x,context) # element-wise multiplication => x shape: (bs, C_context, H_context, W_context)
         return x, attn
-
-
-
-# if __name__=="__main__":
-#     in_chans = 3
-#     img_size = 256
-#     patch_size = 16
-#     embed_dim = 768
-#     num_heads = 8
-#     bs = 64
-#     x = T.randn(bs, in_chans, img_size, img_size)
-#     patch_emb = ViTPatchEmbeddings(img_size=img_size,patch_size=patch_size,in_chans=in_chans,embed_dim=embed_dim)
-#     attn_block = ViTAttention(embed_dim=embed_dim,num_heads=num_heads)
-#     emb = patch_emb(x)
-#     print(emb.shape)
-#     out, attn = attn_block(emb)
-#     print(attn.shape)
-#     print(x.shape)
-#     x = x.cpu().detach().numpy()
-#     attn = attn.cpu().detach().numpy()
-#     # Visualize the attention map
-#     visualize_attention_map(attn[0],x[0])
-#     # visualize_attention_map(attn.squeeze(0).detach().cpu().numpy(), "Attention Map")

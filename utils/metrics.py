@@ -216,7 +216,10 @@ class F1Meter(Metric):
         return self.per_class[i]
 
 class MetricList:
-    def __init__(self, name="MetricList", metrics:list[Metric]=None):
+    def __init__(self, name="MetricList", metrics:list[Metric]=None,n_classes:int=1):
+        if len(metrics)>0 and isinstance(metrics[0], str):
+            assert n_classes is not None, "n_classes must be provided when using a list of strings."
+            self.metrics = [eval(metric)(n_classes) for metric in metrics]
         self.metrics = metrics
         self.initialized_plots = False
         self.updates = 0

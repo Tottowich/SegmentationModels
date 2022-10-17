@@ -14,9 +14,25 @@ def create_model(config_file:str=None,checkpoint:str=None)->Type[UNet]:
     return model
 
 # Create optimizer
-def create_optimizer(model,hyps:dict)->Type[optim.Adam]:
-    optimizer = optim.Adam(model.parameters(),lr=hyps["lr"],weight_decay=hyps["weight_decay"])
-    return optimizer
+def create_optimizer(opt:str="SGD",model=None,hyps:dict=None)->Type[optim.Adam]:
+    optimizers = {
+        "SGD":optim.SGD,
+        "Adam":optim.Adam,
+        "AdamW":optim.AdamW,
+        "Adadelta":optim.Adadelta,
+        "Adagrad":optim.Adagrad,
+        "Adamax":optim.Adamax,
+        "ASGD":optim.ASGD,
+        "LBFGS":optim.LBFGS,
+        "RMSprop":optim.RMSprop,
+        "Rprop":optim.Rprop,
+        "SparseAdam":optim.SparseAdam,
+    }
+    assert opt in optimizers.keys(), f"Optimizer {opt} not supported only supports {optimizers.keys()}"
+    if model is None:
+        return optimizers[opt]
+    else:
+        return optimizers[opt](model.parameters(),**hyps)
 
 # Create loss function
 def create_criterion()->Type[UNetLossFunction]:

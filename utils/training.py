@@ -18,6 +18,7 @@ import torch.nn.functional as F
 # WANDB imports:
 import wandb
 import yaml
+import inspect
 from PIL import Image
 from torch.utils.data import DataLoader
 from wandb.wandb_run import Run
@@ -26,7 +27,12 @@ from models.UNets import UNet
 if __name__=="__main__":
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.helper import view_vram, view_ram, gpu_usage,cpu_usage,ram_usage, gpu_names
-from utils.helper import ModelLogger, normalize, to0_1, to_2array, to_2tuple
+from utils.helper import ModelLogger#, normalize, to0_1, to_2array, to_2tuple
+from loss.loss_functions import UNetLossFunction
+from torch import optim
+from data.loaders import get_dataloader, ADE20K, ADE20KSingleExample, split_dataset
+from torch.utils.data import random_split
+
 from utils.metrics import MetricList
 EPS = 1e-6
 class ProgBar(tqdm):
@@ -281,6 +287,9 @@ class Trainer:
         """
         self.logger = ModelLogger(filename=os.path.join(self.model_info_dir, 'model_info.txt'),visualize=True)
         self.logger.info(self.model) # Print model to file.
+        self.logger.info(self.optimizer) # Print optimizer to file.
+        # Get all hyper parameters from optimizer.
+
         self.logger.timemark()
     def create_dataset_info(self):
         """
@@ -298,37 +307,11 @@ class Trainer:
         else:
             loader = self.val_loader
         trainx, trainy = next(iter(loader)) # Get first batch.
-        fig, axes = plt.subplots(len(trainx)+1, 2, figsize=(10, 10)) # Create figure.
-        for i in range(len(trainx)):
-            img = trainx[i]
-            label = trainy[i]
-            label = self.model.select_prediction(label.unsqueeze(0))
-            img = img.cpu().numpy()
-            img = img * 255
-            img = img.astype(np.uint8).transpose((1,2,0))
-            label = label.cpu().numpy()
-            label = label.astype(np.uint8).transpose((1,2,0))
-            # Create subplot with 1 row and 2 columns
-            # Display the image
-            axes[i,0].imshow(img)
-            # Display the label
-            axes[i,1].imshow(label)
-            # Remove ticks from the plot.
-            axes[i,0].set_xticks([])
-            axes[i,0].set_yticks([])
-            axes[i,1].set_xticks([])
-            axes[i,1].set_yticks([])
-            fig.savefig(os.path.join(self.example_batches_dir, f'{"train" if train else "val"}_batch_{i}.png'))
-
-        # trainx, trainy = next(iter(dataloader)) # Get first batch.
-        # # Store trainx and trainy as a side by side image.
-        # print(f"Trainx shape: {trainx.shape}")
-        # print(f"Trainy shape: {trainy.shape}")
-        # fig, axes = plt.subplots(len(trainx)+1, 2, figsize=(10, 10))
+        # fig, axes = plt.subplots(len(trainx), 2, figsize=(10, 10)) # Create figure.
         # for i in range(len(trainx)):
         #     img = trainx[i]
         #     label = trainy[i]
-        #     label = model.select_prediction(label.unsqueeze(0))
+        #     label = self.model.select_prediction(label.unsqueeze(0))
         #     img = img.cpu().numpy()
         #     img = img * 255
         #     img = img.astype(np.uint8).transpose((1,2,0))
@@ -336,25 +319,34 @@ class Trainer:
         #     label = label.astype(np.uint8).transpose((1,2,0))
         #     # Create subplot with 1 row and 2 columns
         #     # Display the image
-        #     axes[i,0].imshow(img)
-        #     # Display the label
-        #     axes[i,1].imshow(label)
-        #     # Remove ticks from the plot.
-        #     axes[i,0].set_xticks([])
-        #     axes[i,0].set_yticks([])
-        #     axes[i,1].set_xticks([])
-        #     axes[i,1].set_yticks([])
-
-        #     # Show the plot.
-        # # Tighten the layout and show the plot.
-        # fig.tight_layout()
-        # fig.savefig("test.png")
-        # fig.show()    
-        # # def create_logs(self):
-        #         # img = Image.fromarray(img)
-        #         # label = Image.fromarray(label)
-        #         # Create side by side image.
-
+        #     # print(axes.shape)
+        #     if len(axes.shape)>1:
+        #         axes[i,0].imshow(img)
+        #         # Display the label
+        #         axes[i,1].imshow(label)
+        #         # Remove ticks from the plot.
+        #         axes[i,0].set_xticks([])
+        #         axes[i,0].set_yticks([])
+        #         axes[i,1].set_xticks([])
+        #         axes[i,1].set_yticks([])
+        #     else:
+        #         axes[0].imshow(img)
+        #         # Display the label
+        #         axes[1].imshow(label)
+        #         # Remove ticks from the plot.
+        #         axes[0].set_xticks([])
+        #         axes[0].set_yticks([])
+        #         axes[1].set_xticks([])
+        #         axes[1].set_yticks([])
+        # Create an image grid of images and labels using matplotlib.
+        import torchvision
+        grid = torchvision.utils.make_grid(trainx, nrow=4, padding=2, normalize=True, pad_value=0, scale_each=False, range=None, scale=None, )
+        grid = grid.cpu().numpy()
+        grid = grid * 255
+        grid = grid.astype(np.uint8).transpose((1,2,0))
+        plt.imshow(grid)
+        plt.savefig(os.path.join(self.example_batches_dir, 'example_batch.png'))
+        # fig.savefig(os.path.join(self.example_batches_dir, f'{"train" if train else "val"}_batch.png'))
 
 
     def save_checkpoint(self, name: str, epoch: int, batch: int, best: bool = False):
@@ -493,8 +485,7 @@ class Trainer:
         self.logger.info(f"Number of validation samples: {len(self.val_loader.dataset)}")
         self.logger.info(f'Number of test batches: {len(self.test_loader)}')
         self.logger.info(f"Number of test samples: {len(self.test_loader.dataset)}")
-        # self.logger.info(f'Number of classes: {self.num_classes}')
-        # Start training !
+
         if self.pbar:
             self.epoch_pbar = ProgBar(self.epochs,position=0)
             self.epoch_pbar.step(self.epoch, loss=self.val_loss[-1] if len(self.val_loss) > 0 else 0)
@@ -576,21 +567,117 @@ class Trainer:
         self.val_acc = self.metric_list.value
         self.logger.info(f'Val Metrics: {self.val_acc}')
         # self.logger.timemark()
-if __name__=="__main__":
-    pbar1 = ProgBar(1000,position=0)
-    # pbar2 = ProgBar(100,position=1)
-    # TODO FIX PROGBAR, hashing of the dict string bugging
-    delay = []
-    pbar2 = ProgBar(1000,position=1)
-    rand_tens = T.rand(200,1000,1000).cuda()
+# Create model
+def create_model(config_file:str=None,checkpoint:str=None)->Type[UNet]:
+    model = UNet(config=config_file,device="cuda" if T.cuda.is_available() else "cpu",checkpoint=checkpoint)
+    return model
 
-    for i in range(1000):
-        pbar1.step(1)
-        pbar1.refresh()
-        for j in range(1000):
-            pbar2.step(1)
-            dummy = T.matmul(rand_tens,rand_tens)
-            pbar2.display_loss(np.random.rand())
-        pbar2.reset()
-        pbar1.display_loss(np.random.rand())
-    pbar1.plot()
+# Create optimizer
+def create_optimizer(opt:str="SGD",model=None,hyps:dict=None)->Type[optim.Adam]:
+    optimizers = {
+        "SGD":optim.SGD,
+        "Adam":optim.Adam,
+        "AdamW":optim.AdamW,
+        "Adadelta":optim.Adadelta,
+        "Adagrad":optim.Adagrad,
+        "Adamax":optim.Adamax,
+        "ASGD":optim.ASGD,
+        "LBFGS":optim.LBFGS,
+        "RMSprop":optim.RMSprop,
+        "Rprop":optim.Rprop,
+        "SparseAdam":optim.SparseAdam,
+    }
+    assert opt in optimizers.keys(), f"Optimizer {opt} not supported only supports {optimizers.keys()}"
+    # Check that keys in hyps are valid for optimizer
+    valid_keys = inspect.getfullargspec(optimizers[opt]).args
+    valid_hyps = dict([(k,v) for k,v in hyps.items() if k in valid_keys])
+    if model is None:
+        return optimizers[opt]
+    else:
+        return optimizers[opt](model.parameters(),**valid_hyps)
+
+# Create loss function
+def create_criterion(alpha:float=1,beta:float=1,smooth:float=1,eps:float=1e-8)->Type[UNetLossFunction]:
+    loss_function = UNetLossFunction(alpha=alpha,beta=beta,smooth=smooth,eps=eps)
+    return loss_function
+
+# Create dataloader
+def create_ADE20K_dataset(img_size,cache,fraction=1.0,train:bool=True,transform=None,single_example=False,index=0)->Union[ADE20K,ADE20KSingleExample]:
+    if isinstance(img_size,(tuple,list)):
+        img_size = img_size[0] # TODO: Make this more general for rectangular images
+    if single_example:
+        dataset = ADE20KSingleExample(img_size=img_size,transform=transform,fraction=fraction,categorical=True,index=index,train=train)
+    else:
+        dataset = ADE20K(cache=cache,img_size=img_size,fraction=fraction,transform=transform,categorical=True,train=train)
+    return dataset
+
+# Create dataloader
+def create_dataloader(dataset,batch_size,num_workers):
+    dataloader = get_dataloader(dataset,batch_size=batch_size,num_workers=num_workers)
+    return dataloader
+
+# Create trainer
+def create_trainer(
+                model,
+                optimizer,
+                criterion,
+                batch_size,
+                num_workers,
+                device,
+                save_path,
+                hyper_parameters,
+                wandb_run,
+                epochs,
+                log_interval,
+                save_interval,
+                save_best,
+                save_last,
+                val_interval,
+                checkpoint,
+                resume,
+                verbose,
+                metric_list,
+                pbar,
+                train_loader:Type[DataLoader]=None,
+                val_loader:Type[DataLoader]=None,
+                test_loader:Type[DataLoader]=None,
+                dataset:Union[ADE20K,ADE20KSingleExample]=None,
+                )->Type[Trainer]:
+    if dataset is not None and len(dataset) > 1:
+        train_set, val_set, test_set = split_dataset(dataset)
+        train_loader = create_dataloader(train_set,batch_size,num_workers)
+        val_loader = create_dataloader(val_set,batch_size,num_workers)
+        test_loader = create_dataloader(test_set,batch_size,num_workers)
+    elif dataset is not None:
+        train_loader = create_dataloader(dataset,batch_size,num_workers)
+        val_loader = train_loader
+        test_loader = train_loader
+    else:
+        assert train_loader is not None, "Must provide train_loader if dataset is None"
+        assert val_loader is not None, "Must provide val_loader if dataset is None"
+        assert test_loader is not None, "Must provide test_loader if dataset is None"
+
+    trainer = Trainer(
+        model=model,
+        optimizer=optimizer,
+        criterion=criterion,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        test_loader=test_loader,
+        device=device,
+        save_path=save_path,
+        hyper_parameters=hyper_parameters,
+        wandb_run=wandb_run,
+        epochs=epochs,
+        log_interval=log_interval,
+        save_interval=save_interval,
+        save_best=save_best,
+        save_last=save_last,
+        val_interval=val_interval,
+        checkpoint=checkpoint,
+        resume=resume,
+        verbose=verbose,
+        metric_list=metric_list,
+        pbar=pbar,
+    )
+    return trainer

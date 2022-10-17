@@ -15,8 +15,8 @@ from models.UNets import *
 from models.Attention import *
 from testing_utils import visualize_model
 from testing_utils import time_func,test_backprop, flop_counter, memory_usage, TestLogger, check_backends
-import inspect
 from inspect import getmembers, isfunction
+
 import PySimpleGUI as sg
 import traceback
 # Test the various classes in the UNets.py file

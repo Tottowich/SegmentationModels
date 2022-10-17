@@ -32,3 +32,13 @@ def visualize_attention_map(attention_map, image, save_path=None):
         ax.axis("off")
     plt.show()
 
+class SegmentationVisualizer:
+    """
+    Visualize the segmentation results
+    """
+    def __init__(self, n_classes, class_names=None):
+        self.n_classes = n_classes
+        self.class_names = class_names
+        # Each class should be assigned a color
+        self.colors = cm.rainbow(np.linspace(0, 1, n_classes))
+

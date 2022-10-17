@@ -203,9 +203,10 @@ class ADE20K(Dataset):
     def __init__(self,train:bool=True,cache:bool=False,img_size:int=520,transform:transforms=None,categorical:bool=False,fraction:float=None) -> None:
         from data.ADE20KSegmentation import ADE20KSegmentation
         super().__init__()
-        transform = transforms.Compose([
-            transforms.ToTensor(),
-        ])
+        if transform is None:
+            transform = transforms.Compose([
+                transforms.ToTensor(),
+            ])
 
         self.dataset = ADE20KSegmentation(split='train' if train else 'val', transform=transform,crop_size=img_size,categorical=categorical)
         self.fraction = fraction if fraction is not None else 1.0
@@ -224,6 +225,12 @@ class ADE20K(Dataset):
     @property
     def num_classes(self) -> int:
         return self._num_classes
+    @property
+    def num_channels(self) -> int:
+        return 3
+    @property
+    def img_size(self) -> int:
+        return self.dataset.crop_size
     def __getitem__(self, index: int) -> tuple[T.Tensor,T.Tensor]:
         if self.cached:
             d = self.data[index]
@@ -248,53 +255,6 @@ class ADE20K(Dataset):
 
         for c in classes:
             print(f'Class {c}:{self.class_names[c]} has {np.sum(label.numpy()==c)} pixels')
-    # def __iter__(self):
-    #     if self.cached:
-    #         return iter(self.data)
-    #     return iter(self.dataset)
-    # def __next__(self):
-    #     if self.cached:
-    #         return next(self.data)
-    #     return next(self.dataset)
-
-# class ADE20KBase(Dataset):
-#     def __init__(self,train:bool=True,cache:bool=False,img_size:tuple[int,int]=(256,256),transform:transforms=None,categorical:bool=False,fraction:float=None) -> None:
-#         from ADE20KSegmentation import ADE20KSegmentation
-#         super().__init__()
-#         self.dataset = ADE20KSegmentation(split='train' if train else 'val', transform=transform,categorical=categorical)
-#         self.fraction = fraction if fraction is not None else 1.0
-#         self.class_names = ADE20KSegmentation.CLASSES
-            
-#         self._num_classes = self.dataset.num_class
-#         self.cached = cache
-#         if cache:
-#             self._cache_data()
-#     def _cache_data(self):
-#         """ Cache the data in memory """
-#         self.data = [self.dataset[i] for i in tqdm(range(int(len(self.dataset)*self.fraction)), desc='Caching data')]
-#     def __len__(self) -> int:
-#         return len(self.dataset)
-#     @property
-#     def num_classes(self) -> int:
-#         return self._num_classes
-#     def print_labels(self,index,show:bool=True,display_special:int=None) -> None:
-#         """ Print the labels of a label image """
-#         img, label = self[index]
-#         if show:
-#             plt.imshow(label)
-#             plt.title('Label image')
-#             plt.show()
-#             if display_special is not None:
-#                 plt.imshow((label==display_special)*255, cmap='gray')
-#                 plt.title(self.class_names[display_special])
-#                 plt.show("Special label image")
-#             plt.imshow(img.permute(1,2,0))
-#             plt.title('Image')
-#             plt.show()
-#         classes = np.unique(label)
-#         for c in classes:
-#             print(f'Class {c}:{self.class_names[c]} has {np.sum(label.numpy()==c)} pixels')
-
 
 class ADE20KSingleExample(Dataset):
     def __init__(self,train:bool=True,img_size:int=520,transform:transforms=None,fraction:float=1.0,categorical:bool=False,index:int=0) -> None:
@@ -304,6 +264,9 @@ class ADE20KSingleExample(Dataset):
             transforms.ToTensor(),
             # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
+        # Check if tuple or list
+        if isinstance(img_size, (tuple, list)):
+            img_size = img_size[0]
         self.dataset = ADE20KSegmentation(split='train' if train else 'val', transform=transform,crop_size=img_size,categorical=categorical)
         self._num_classes = self.dataset.num_class
         self.example = self.dataset[index]
