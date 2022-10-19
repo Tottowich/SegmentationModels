@@ -54,7 +54,7 @@ class Metric(object):
 
 
 class AverageMeter(Metric):
-    def __init__(self, name="AverageMeter"):
+    def __init__(self, name="AverageMeter",num_classes:int=1, class_names:List[str]=None):
         super(AverageMeter, self).__init__(name)
         self.reset()
     def _reset(self):
@@ -68,15 +68,15 @@ class AverageMeter(Metric):
         return self.sum / self.count if self.count else 0
 
 class AccuracyMeter(Metric):
-    def __init__(self, name="AccuracyMeter",n_classes:int=1, class_names:List[str]=None):
+    def __init__(self, name="AccuracyMeter",num_classes:int=1, class_names:List[str]=None):
         super(AccuracyMeter, self).__init__(name)
-        self.n_classes = n_classes
+        self.num_classes = num_classes
         self.correct_area = None
         self.reset()
     def _reset(self):
         self.correct = 0
         self.count = 0
-        self._confusion_matrix = np.zeros(self.n_classes, dtype=np.int32)
+        self._confusion_matrix = np.zeros(self.num_classes, dtype=np.int32)
     def _update(self, pred:Union[T.Tensor, np.ndarray], target:Union[T.Tensor, np.ndarray]):
         """
         Predictions and targets are expected to be in the same shape.
@@ -92,7 +92,7 @@ class AccuracyMeter(Metric):
         self.correct += np.sum(self.correct_area)
         self.count += pred.size
         # Confusion matrix should be (n_classes, n_classes) and contain the fraction of pixels of class i that were predicted as class j.
-        self._confusion_matrix += np.bincount(self.n_classes * target.reshape(-1) + pred.reshape(-1), minlength=self.n_classes**2).reshape(self.n_classes, self.n_classes)
+        self._confusion_matrix += np.bincount(self.num_classes * target.reshape(-1) + pred.reshape(-1), minlength=self.num_classes**2).reshape(self.num_classes, self.num_classes)
         # Normalize along the rows
         self._confusion_matrix = self._confusion_matrix / self._confusion_matrix.sum(axis=1, keepdims=True)
         # Replace NaNs with 0
@@ -105,16 +105,16 @@ class AccuracyMeter(Metric):
         """
         fig,ax = plt.subplots()
         ax.imshow(self._confusion_matrix, cmap="Blues")
-        for i in range(self.n_classes):
-            for j in range(self.n_classes):
+        for i in range(self.num_classes):
+            for j in range(self.num_classes):
                 ax.text(j, i, round(self._confusion_matrix[i, j],2), ha="center", va="center", color="w")
         # Add faint line through the diagonal
-        ax.plot([0, self.n_classes-1], [0, self.n_classes-1], color="k", linestyle="--",alpha=0.2)
+        ax.plot([0, self.num_classes-1], [0, self.num_classes-1], color="k", linestyle="--",alpha=0.2)
         # ax.plot([0, self.n_classes-1], [0, self.n_classes-1], color="k", linestyle="--")
         ax.set_xlabel("Predicted")
         ax.set_ylabel("Target")
-        ax.set_xticks(np.arange(self.n_classes), self.class_names[:self.n_classes])
-        ax.set_yticks(np.arange(self.n_classes), self.class_names[:self.n_classes])
+        ax.set_xticks(np.arange(self.num_classes), self.class_names[:self.num_classes])
+        ax.set_yticks(np.arange(self.num_classes), self.class_names[:self.num_classes])
         plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
                 rotation_mode="anchor")
         ax.set_title("Confusion Matrix")
@@ -134,13 +134,14 @@ class AccuracyMeter(Metric):
         return self._confusion_matrix
     
 class IoUMeter(Metric):
-    def __init__(self, name="IoUMeter", n_classes:int=1, class_names:List[str]=None):
+    def __init__(self, name="IoUMeter", num_classes:int=1, class_names:List[str]=None):
         super(IoUMeter, self).__init__(name)
-        self.n_classes = n_classes
+        self.num_classes = num_classes
         self.reset()
     def _reset(self):
-        self.intersection = np.zeros(self.n_classes, dtype=np.int32)
-        self.union = np.zeros(self.n_classes, dtype=np.int32)
+        print("n_classes", self.num_classes, "type", type(self.num_classes))
+        self.intersection = np.zeros(self.num_classes, dtype=np.int32)
+        self.union = np.zeros(self.num_classes, dtype=np.int32)
     def _update(self, pred:Union[T.Tensor, np.ndarray], target:Union[T.Tensor, np.ndarray]):
         """
         Predictions and targets are expected to be in the same shape.
@@ -152,7 +153,7 @@ class IoUMeter(Metric):
         if isinstance(target, T.Tensor):
             target = target.detach().cpu().numpy()
         assert pred.shape == target.shape, "Predictions and targets should have the same shape." # Shape should be (batch_size, H, W)
-        for i in range(self.n_classes):
+        for i in range(self.num_classes):
             self.intersection[i] += np.sum((pred == i) & (target == i))
             self.union[i] += np.sum((pred == i) | (target == i))
         return self.value
@@ -172,14 +173,14 @@ class IoUMeter(Metric):
 
 
 class F1Meter(Metric):
-    def __init__(self, name="F1Meter", n_classes:int=1):
+    def __init__(self, name="F1Meter", num_classes:int=1,class_names:list[str]=None):
         super(F1Meter, self).__init__(name)
-        self.n_classes = n_classes
+        self.num_classes = num_classes
         self.reset()
     def _reset(self):
-        self.tp = np.zeros(self.n_classes, dtype=np.int32)
-        self.fp = np.zeros(self.n_classes, dtype=np.int32)
-        self.fn = np.zeros(self.n_classes, dtype=np.int32)
+        self.tp = np.zeros(self.num_classes, dtype=np.int32)
+        self.fp = np.zeros(self.num_classes, dtype=np.int32)
+        self.fn = np.zeros(self.num_classes, dtype=np.int32)
     def _update(self, pred:Union[T.Tensor, np.ndarray], target:Union[T.Tensor, np.ndarray]):
         """
         Predictions and targets are expected to be in the same shape.
@@ -191,7 +192,7 @@ class F1Meter(Metric):
         if isinstance(target, T.Tensor):
             target = target.detach().cpu().numpy()
         assert pred.shape == target.shape, "Predictions and targets should have the same shape." # Shape should be (batch_size, H, W)
-        for i in range(self.n_classes):
+        for i in range(self.num_classes):
             self.tp[i] += np.sum((pred == i) & (target == i))
             self.fp[i] += np.sum((pred == i) & (target != i))
             self.fn[i] += np.sum((pred != i) & (target == i))
@@ -216,10 +217,10 @@ class F1Meter(Metric):
         return self.per_class[i]
 
 class MetricList:
-    def __init__(self, name="MetricList", metrics:list[Metric]=None,n_classes:int=1,class_names:List[str]=None):
+    def __init__(self, name="MetricList", metrics:list[Metric]=None,num_classes:int=1,class_names:List[str]=None):
         if len(metrics)>0 and isinstance(metrics[0], str):
-            assert n_classes is not None, "n_classes must be provided when using a list of strings."
-            self.metrics = [eval(metric)(n_classes) for metric in metrics]
+            assert num_classes is not None, "n_classes must be provided when using a list of strings."
+            self.metrics = [eval(metric)(num_classes) for metric in metrics]
         self.metrics = metrics
         self.initialized_plots = False
         self.updates = 0
@@ -286,7 +287,7 @@ if __name__ == "__main__":
     size = 100
     batch_size = 10
     acc = AccuracyMeter(n_classes=n_classes)
-    iou = IoUMeter(n_classes=n_classes)
+    iou = IoUMeter(num_classes=n_classes)
     f1 = F1Meter(n_classes=n_classes)
     met_list = MetricList(metrics=[acc,iou,f1])
     for i in range(100):

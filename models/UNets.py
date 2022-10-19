@@ -702,7 +702,7 @@ class UNet(nn.Module):
         y,attn_s,y_s = self.decoder(encoder_outputs)
         return  y,attn_s,y_s
     @property
-    def config(self)->tuple[dict]:
+    def config(self)->dict:
         config = {}
         config["num_classes"] = self.num_classes
         config["in_channels"] = self.encoder.in_channels

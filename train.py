@@ -195,7 +195,7 @@ if __name__=="__main__":
             checkpoint=checkpoint,
             resume=False,
             verbose=True,
-            metric_list=MetricList(metrics=[AccuracyMeter(n_classes=n_classes),IoUMeter(n_classes=n_classes),F1Meter(n_classes=n_classes)]),
+            metric_list=MetricList(metrics=[AccuracyMeter(n_classes=n_classes),IoUMeter(num_classes=n_classes),F1Meter(n_classes=n_classes)]),
             pbar=True,
         )
         trainer.train()

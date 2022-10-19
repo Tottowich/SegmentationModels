@@ -109,6 +109,9 @@ class TrainGui:
 
         ]
         col2 = [[sg.Text("Metrics",font=(self.font, self.font_size))]] + [[sg.Checkbox(metric,font=(self.font, int(self.font_size/1.5)),key=metric,default=True)] for metric in self.metrics]
+        col2.insert(0,[sg.Text("Select metrics",font=(self.font, self.font_size))])
+        col2.append([sg.Text("Select all",font=(self.font, self.font_size)),sg.Checkbox("",key="-ALL_METRICS-",enable_events=True)])
+        col2.append([sg.Text("Select none",font=(self.font, self.font_size)),sg.Checkbox("",key="-NONE_METRICS-",enable_events=True)])
         col1 = [[sg.Column(col1,vertical_alignment="top")]]
         # Center column 2 vertically
         col2 = [[sg.Column(col2,vertical_alignment="bottom")]]
@@ -158,18 +161,14 @@ class TrainGui:
         criterion = create_criterion(alpha=alpha,beta=beta)
         train_dataset = create_ADE20K_dataset(img_size=model.img_size,fraction=fraction,cache=cache,single_example=single_example,train=True)
         train_loader = create_dataloader(train_dataset,bs,num_workers)
-        n_classes = train_dataset.num_classes
+        num_classes = train_dataset.num_classes
         class_names = train_dataset.class_names
-        print("Number of classes: ",n_classes)
-        print("Class names: ",len(class_names))
         initialize_metrics = []
         for metric_class in Metric.__subclasses__():
             if metric_class.__name__ in metrics:
-                print("Initializing metric: ",metric_class.__name__)
-                print("Metrics class: ", metric_class)
-                metric = metric_class(n_classes,class_names)
+                metric = metric_class(num_classes=num_classes,class_names=class_names)
                 initialize_metrics.append(metric)
-        metric_list = MetricList(metrics=initialize_metrics,n_classes=n_classes,class_names=class_names)
+        metric_list = MetricList(metrics=initialize_metrics,num_classes=num_classes,class_names=class_names)
         # train_loader = create_dataloader(train_dataset,bs,num_workers)
         if not single_example:
             val_dataset = create_ADE20K_dataset(img_size=model.img_size,fraction=fraction,cache=cache,single_example=single_example,train=False)
@@ -207,7 +206,7 @@ class TrainGui:
             verbose=verbose,
             metric_list=metric_list,
             pbar=pbar,
-            n_classes=n_classes,
+            n_classes=num_classes,
             class_names=class_names,            
         )
         # Add checkmark to initialize trainer button
@@ -241,9 +240,22 @@ class TrainGui:
                 self.init_trainer(values)
             elif event == "Start training":
                 self.start_training()
+            if values["-ALL_METRICS-"] and values["-NONE_METRICS-"]:
+                sg.popup("Please select either all or none metrics.",title="Note!",icon=self.icon(),auto_close_duration=1)
+                self.gui["-ALL_METRICS-"].update(False)
+                self.gui["-NONE_METRICS-"].update(False)
+            elif values["-ALL_METRICS-"]:
+                self.check_all_metrics()
+            elif values["-NONE_METRICS-"]:
+                self.uncheck_all_metrics()
         self.gui.close()
         
-
+    def check_all_metrics(self):
+        for metric in self.metrics:
+            self.gui[metric].update(True)
+    def uncheck_all_metrics(self):
+        for metric in self.metrics:
+            self.gui[metric].update(False)
 if __name__=="__main__":
     # sg.theme_previewer()
     gui = TrainGui()

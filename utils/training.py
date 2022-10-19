@@ -341,7 +341,7 @@ class Trainer:
         """
         checkpoint = {
             'model': self.model.state_dict(),
-            'model_config': self.model.config(),
+            'model_config': self.model.config,
             'optimizer': self.optimizer.state_dict(),
             'epoch': epoch,
             'batch': batch,
@@ -545,8 +545,9 @@ class Trainer:
         val_loss /= len(self.val_loader)
         self.val_loss.append(val_loss)
         self.logger.info(f'Val loss: {val_loss:.4f} after {self.epoch + 1} epochs.')
-        self.val_acc = self.metric_list.value
-        self.logger.info(f'Val Metrics: {self.val_acc}')
+        if len(self.metric_list):
+            self.val_acc = self.metric_list.value
+            self.logger.info(f'Val Metrics: {self.val_acc}')
         # self.logger.timemark()
 # Create model
 def create_model(config_file:str=None,checkpoint:str=None)->Type[UNet]:
