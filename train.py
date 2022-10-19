@@ -7,7 +7,9 @@ from models.UNets import UNet
 from torch import optim
 from loss.loss_functions import UNetLossFunction
 from typing import Type, Union, List, Tuple, Dict, Optional
-
+import warnings
+# Interupt on user warning
+warnings.simplefilter("error", UserWarning)
 # Create model
 def create_model(config_file:str=None,checkpoint:str=None)->Type[UNet]:
     model = UNet(config=config_file,device="cuda" if T.cuda.is_available() else "cpu",checkpoint=checkpoint)
@@ -109,46 +111,95 @@ def create_trainer(
         pbar=pbar,
     )
     return trainer
+import argparse
+def input_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--gui",action="store_true",help="Use GUI to select config file")
+    parser.add_argument("--batch_size",type=int,default=1)
+    parser.add_argument("--num_workers",type=int,default=0)
+    parser.add_argument("--epochs",type=int,default=10)
+    parser.add_argument("--log_interval",type=int,default=10)
+    parser.add_argument("--save_interval",type=int,default=1)
+    parser.add_argument("--val_interval",type=int,default=1)
+    parser.add_argument("--save_best",type=bool,default=True)
+    parser.add_argument("--save_last",type=bool,default=True)
+    parser.add_argument("--resume",type=bool,default=False)
+    parser.add_argument("--verbose",type=bool,default=True)
+    parser.add_argument("--config_file",type=str,default="config.json")
+    parser.add_argument("--checkpoint",type=str,default=None)
+    parser.add_argument("--save_path",type=str,default="checkpoints")
+    parser.add_argument("--cache",type=str,default="cache")
+    parser.add_argument("--img_size",type=int,default=256)
+    parser.add_argument("--fraction",type=float,default=1.0)
+    parser.add_argument("--single_example",type=bool,default=False)
+    parser.add_argument("--index",type=int,default=0)
+    parser.add_argument("--wandb",type=bool,default=False)
+    parser.add_argument("--wandb_project",type=str,default="UNet")
+    parser.add_argument("--wandb_entity",type=str,default="joseph")
+    parser.add_argument("--wandb_run",type=str,default=None)
+    parser.add_argument("--wandb_tags",type=str,default=None)
+    parser.add_argument("--wandb_notes",type=str,default=None)
+    parser.add_argument("--wandb_name",type=str,default=None)
+    parser.add_argument("--wandb_group",type=str,default=None)
+    parser.add_argument("--wandb_job_type",type=str,default=None)
+    parser.add_argument("--wandb_save_code",type=bool,default=False)
+    parser.add_argument("--wandb_resume",type=bool,default=False)
+    parser.add_argument("--wandb_id",type=str,default=None)
+    parser.add_argument("--wandb_offline",type=bool,default=False)
+    parser.add_argument("--wandb_config",type=str,default=None)
+    parser.add_argument("--wandb_config_exclude_keys",type=str,default=None)
+    parser.add_argument("--wandb_config_include_keys",type=str,default=None)
+    parser.add_argument("--wandb_config_patch",type=str,default=None)
+
+    args = parser.parse_args()
+    return args
 
 if __name__=="__main__":
-    config_file = None #"./models/model_configs/UNet.yaml"
-    checkpoint = "runs/UNet_2022-10-14_21-53-51/checkpoints/epoch_80.pt"
-    # print(config_file)
-    model = create_model(config_file,checkpoint)
-    # model = UNet
-    hyps = {"lr":1e-4,"weight_decay":1e-5}
-    optimizer = create_optimizer(model,hyps)
-    optimizer = optim.Adam
-    # optimizer = None
-    dataset = create_ADE20K_dataset(img_size=model.img_size[0],cache=True,fraction=1.0,single_example=True)
-    # dataset = create_dataset(img_size=256,cache=True,fraction=0.0001,single_example=True)
-    criterion = create_criterion()
-    n_classes = dataset.num_classes
-    trainer = create_trainer(
-        model=model,
-        optimizer=optimizer,
-        criterion=criterion,
-        dataset=dataset,
-        batch_size=10,
-        num_workers=4,
-        device="cuda" if T.cuda.is_available() else "cpu",
-        save_path="./runs/UNet",
-        hyper_parameters=hyps,
-        wandb_run=None,
-        epochs=100,
-        log_interval=5,
-        save_interval=20,
-        save_best=True,
-        save_last=True,
-        val_interval=5,
-        checkpoint=checkpoint,
-        resume=False,
-        verbose=True,
-        metric_list=MetricList(metrics=[AccuracyMeter(n_classes=n_classes),IoUMeter(n_classes=n_classes),F1Meter(n_classes=n_classes)]),
-        pbar=True,
-    )
-    trainer.train()
-    # model = UNet
+    args = input_arguments()
+    if args.gui:
+        from utils.train_gui import TrainGui
+        gui = TrainGui((1280,720))
+        gui.run()
+    else:
+
+        config_file = None #"./models/model_configs/UNet.yaml"
+        checkpoint = "runs/UNet_2022-10-14_21-53-51/checkpoints/epoch_80.pt"
+        # print(config_file)
+        model = create_model(config_file,checkpoint)
+        # model = UNet
+        hyps = {"lr":1e-4,"weight_decay":1e-5}
+        optimizer = create_optimizer(model,hyps)
+        optimizer = optim.Adam
+        # optimizer = None
+        dataset = create_ADE20K_dataset(img_size=model.img_size[0],cache=True,fraction=1.0,single_example=True)
+        # dataset = create_dataset(img_size=256,cache=True,fraction=0.0001,single_example=True)
+        criterion = create_criterion()
+        n_classes = dataset.num_classes
+        trainer = create_trainer(
+            model=model,
+            optimizer=optimizer,
+            criterion=criterion,
+            dataset=dataset,
+            batch_size=10,
+            num_workers=4,
+            device="cuda" if T.cuda.is_available() else "cpu",
+            save_path="./runs/UNet",
+            hyper_parameters=hyps,
+            wandb_run=None,
+            epochs=100,
+            log_interval=5,
+            save_interval=20,
+            save_best=True,
+            save_last=True,
+            val_interval=5,
+            checkpoint=checkpoint,
+            resume=False,
+            verbose=True,
+            metric_list=MetricList(metrics=[AccuracyMeter(n_classes=n_classes),IoUMeter(n_classes=n_classes),F1Meter(n_classes=n_classes)]),
+            pbar=True,
+        )
+        trainer.train()
+        # model = UNet
     # hyps = {"lr":1e-4,"weight_decay":1e-5}
     # optimizer = optim.Adam
     # dataset = create_dataset(img_size=256,cache=True,fraction=0.05,single_example=True)

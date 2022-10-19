@@ -68,7 +68,7 @@ class AverageMeter(Metric):
         return self.sum / self.count if self.count else 0
 
 class AccuracyMeter(Metric):
-    def __init__(self, name="AccuracyMeter",n_classes:int=1):
+    def __init__(self, name="AccuracyMeter",n_classes:int=1, class_names:List[str]=None):
         super(AccuracyMeter, self).__init__(name)
         self.n_classes = n_classes
         self.correct_area = None
@@ -76,7 +76,7 @@ class AccuracyMeter(Metric):
     def _reset(self):
         self.correct = 0
         self.count = 0
-        self._confusion_matrix = np.zeros((self.n_classes, self.n_classes), dtype=np.int32)
+        self._confusion_matrix = np.zeros(self.n_classes, dtype=np.int32)
     def _update(self, pred:Union[T.Tensor, np.ndarray], target:Union[T.Tensor, np.ndarray]):
         """
         Predictions and targets are expected to be in the same shape.
@@ -134,7 +134,7 @@ class AccuracyMeter(Metric):
         return self._confusion_matrix
     
 class IoUMeter(Metric):
-    def __init__(self, name="IoUMeter", n_classes:int=1):
+    def __init__(self, name="IoUMeter", n_classes:int=1, class_names:List[str]=None):
         super(IoUMeter, self).__init__(name)
         self.n_classes = n_classes
         self.reset()
@@ -216,7 +216,7 @@ class F1Meter(Metric):
         return self.per_class[i]
 
 class MetricList:
-    def __init__(self, name="MetricList", metrics:list[Metric]=None,n_classes:int=1):
+    def __init__(self, name="MetricList", metrics:list[Metric]=None,n_classes:int=1,class_names:List[str]=None):
         if len(metrics)>0 and isinstance(metrics[0], str):
             assert n_classes is not None, "n_classes must be provided when using a list of strings."
             self.metrics = [eval(metric)(n_classes) for metric in metrics]

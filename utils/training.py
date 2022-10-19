@@ -32,7 +32,7 @@ from loss.loss_functions import UNetLossFunction
 from torch import optim
 from data.loaders import get_dataloader, ADE20K, ADE20KSingleExample, split_dataset
 from torch.utils.data import random_split
-
+from utils.visualizations import SegmentationVisualizer
 from utils.metrics import MetricList
 EPS = 1e-6
 class ProgBar(tqdm):
@@ -171,6 +171,10 @@ class Trainer:
     The trainer handels the logging of information to local folder as well.
     This folder will include:
         - Hyperparameters: Yaml file containing hyper parameters used when training.
+        TODO: - Weights and Biases: Weights and Biases project.
+        TODO: - Tensorboard: Tensorboard project.
+        TODO: - Learningrate scheduler: Learningrate scheduler.
+
         - ModelInfo: Folder containing a text file discribing the model, as well as a plot of the model.
         - Dataset information: Yaml file containing differnt type of information regarding the used dataset;
             - Distrubution of classes,
@@ -191,7 +195,7 @@ class Trainer:
                  test_loader: DataLoader, device: T.device, save_path: str,
                  hyper_parameters: Dict, wandb_run: Optional[Run] = None, epochs:int=100,log_interval: int = 10,
                  save_interval: int = 10, save_best: bool = True, save_last: bool = True,val_interval: int = 10,
-                 checkpoint: Optional[str] = None, resume: bool = False, verbose: bool = True,metric_list:MetricList=None,pbar:Union[ProgBar,bool]=True):
+                 checkpoint: Optional[str] = None, resume: bool = False, verbose: bool = True,metric_list:MetricList=None,pbar:Union[ProgBar,bool]=True,n_classes:int=151,class_names:list[str]=None):
         """
         Args:
             model: Model to train.
@@ -248,13 +252,20 @@ class Trainer:
         self.metric_list = metric_list
         self.pbar = pbar
         self.criterion = criterion
+        self.n_classes = n_classes
+        self.class_names = class_names
+        self.seg_visualizer = SegmentationVisualizer(n_classes=n_classes,class_names=class_names)
         self.model = self.model.to(self.device)
-
+        if self.val_loader is None:
+            self.val_loader = self.train_loader
+        if self.test_loader is None:
+            self.test_loader = self.val_loader
         T.backends.cudnn.benchmark = True
         self.create_save_paths()
         self.create_dataset_info()
         self.create_model_info()
         self.create_example_batches()
+        print("Trainer initialized.")
         if not self.resume:
             # assert self.save_path != self.checkpoint, 'Save path and checkpoint path cannot be the same if a new training isnstance is to be created.'
             # self.create_dataset_info()
@@ -306,48 +317,18 @@ class Trainer:
             loader = self.train_loader
         else:
             loader = self.val_loader
-        trainx, trainy = next(iter(loader)) # Get first batch.
-        # fig, axes = plt.subplots(len(trainx), 2, figsize=(10, 10)) # Create figure.
-        # for i in range(len(trainx)):
-        #     img = trainx[i]
-        #     label = trainy[i]
-        #     label = self.model.select_prediction(label.unsqueeze(0))
-        #     img = img.cpu().numpy()
-        #     img = img * 255
-        #     img = img.astype(np.uint8).transpose((1,2,0))
-        #     label = label.cpu().numpy()
-        #     label = label.astype(np.uint8).transpose((1,2,0))
-        #     # Create subplot with 1 row and 2 columns
-        #     # Display the image
-        #     # print(axes.shape)
-        #     if len(axes.shape)>1:
-        #         axes[i,0].imshow(img)
-        #         # Display the label
-        #         axes[i,1].imshow(label)
-        #         # Remove ticks from the plot.
-        #         axes[i,0].set_xticks([])
-        #         axes[i,0].set_yticks([])
-        #         axes[i,1].set_xticks([])
-        #         axes[i,1].set_yticks([])
-        #     else:
-        #         axes[0].imshow(img)
-        #         # Display the label
-        #         axes[1].imshow(label)
-        #         # Remove ticks from the plot.
-        #         axes[0].set_xticks([])
-        #         axes[0].set_yticks([])
-        #         axes[1].set_xticks([])
-        #         axes[1].set_yticks([])
-        # Create an image grid of images and labels using matplotlib.
-        import torchvision
-        grid = torchvision.utils.make_grid(trainx, nrow=4, padding=2, normalize=True, pad_value=0, scale_each=False, range=None, scale=None, )
-        grid = grid.cpu().numpy()
-        grid = grid * 255
-        grid = grid.astype(np.uint8).transpose((1,2,0))
-        plt.imshow(grid)
-        plt.savefig(os.path.join(self.example_batches_dir, 'example_batch.png'))
-        # fig.savefig(os.path.join(self.example_batches_dir, f'{"train" if train else "val"}_batch.png'))
-
+        for trainx, trainy in loader:
+            trainy = self.model.select_prediction(trainy)
+            fig = self.seg_visualizer.grid(trainx.numpy(),trainy.numpy(),None)
+            break
+        for txt in fig.texts:
+            txt.set_visible(False)
+        # Get axes from figure.
+        axes = fig.get_axes()
+        for ax in axes:
+            for txt in ax.texts:
+                txt.set_visible(False)
+        fig.savefig(os.path.join(self.example_batches_dir, 'example_batch.png'))
 
     def save_checkpoint(self, name: str, epoch: int, batch: int, best: bool = False):
         """
@@ -679,5 +660,7 @@ def create_trainer(
         verbose=verbose,
         metric_list=metric_list,
         pbar=pbar,
+        n_classes=dataset.num_classes,
+        class_names=dataset.class_names,
     )
     return trainer
