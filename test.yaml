@@ -5,12 +5,12 @@ decoder: # Decoder configuration
   - relu
   - relu
   - relu
-  attention: # Self attention per decoder block
+  attention: # Cross attention per decoder block
   - true
   - true
   - false
   - false
-  attn_drop: # Dropout for self attention per decoder block
+  attn_drop: # Dropout for cross attention per decoder block
   - 0.0
   - 0.0
   - 0.0
@@ -30,7 +30,7 @@ decoder: # Decoder configuration
   - 1
   - 1
   - 1
-  embed_dim:
+  embed_dim: # Embedding dimension for cross attention per decoder block
   - 768
   - 768
   - 768
@@ -55,6 +55,7 @@ decoder: # Decoder configuration
   - 8
   - 16
   - 16
+  
 encoder:
   acts:
   - true

@@ -87,6 +87,7 @@ class Conv1x1(nn.Module):
             blocks.append(nn.BatchNorm2d(out_channels))
             blocks.append(activation)
             blocks.append(nn.Dropout(dropout))
+            in_channels = out_channels
         self.conv = nn.Sequential(*blocks)
         # self.conv = nn.Conv2d(in_channels, out_channels, 1, 1, 0)
         # self.bn = nn.BatchNorm2d(out_channels)
@@ -94,9 +95,6 @@ class Conv1x1(nn.Module):
         # self.activation = activation if not None else nn.Identity()
     def forward(self, x):
         x = self.conv(x)
-        # x = self.bn(x)
-        # x = self.dropout(x)
-        # x = self.activation(x)
         return x
 class Conv3x3(nn.Module):
     def __init__(self, in_channels:int, out_channels:int,reps:int=1,activation:nn.Module=None,dropout:float=0.0,norm:bool=True):
@@ -116,16 +114,10 @@ class Conv3x3(nn.Module):
             blocks.append(nn.BatchNorm2d(out_channels) if norm else nn.Identity())
             blocks.append(activation if activation is not None else nn.Identity())
             blocks.append(nn.Dropout2d(dropout))
+            in_channels = out_channels
         self.conv = nn.Sequential(*blocks)
-        # self.conv = nn.Conv2d(in_channels, out_channels, 3, 1, 1) # Same padding
-        # self.bn = nn.BatchNorm2d(out_channels)
-        # self.dropout = nn.Dropout2d(dropout)
-        # self.activation = activation if not None else nn.Identity()
     def forward(self, x):
         x = self.conv(x)
-        # x = self.bn(x)
-        # x = self.dropout(x)
-        # x = self.activation(x)
         return x
 class EncoderBlock(nn.Module):
     depth = 0
@@ -460,6 +452,7 @@ class DecoderBlock(nn.Module):
                 conv1x1:bool=1,
                 conv3x3:int=1,
                 activation:nn.Module=None,
+                norm:bool=False,
                 ):
         super().__init__()
         self.in_channels = in_channels
@@ -472,19 +465,17 @@ class DecoderBlock(nn.Module):
         self.num_heads = num_heads
         self.patch_size = patch_size
         self.attn_drop = attn_drop
+        self.norm = norm
         self.upsample = UpSampleBlock(in_channels,in_channels)
         # self.attn_proj = Conv1x1()
         # print(f"Activation Decoder: {activation}")
         self.conv_attn = Conv1x1(in_channels,in_channels,reps=conv1x1,activation=activation) if attention else nn.Identity()
-        # self.conv1x1 = Conv1x1(in_channels,out_channels,reps=conv1x1) if conv1x1 else nn.Identity()
         self.conv1x1 = Conv1x1(in_channels,context_channels,reps=conv1x1,activation=activation) if conv1x1 else nn.Identity()
-        # self.conv3x3 = Conv3x3(in_channels,out_channels,reps=conv3x3) if conv3x3 else nn.Identity()
-        self.conv3x3 = Conv3x3(2*context_channels,out_channels,reps=conv3x3,activation=activation) if conv3x3 else nn.Identity()
-        # self.norm = nn.LayerNorm(out_channels) Maybe??
+        self.conv3x3 = Conv3x3(2*context_channels,out_channels,reps=conv3x3,activation=activation,norm=norm) if conv3x3 else nn.Identity()
         if attention:
             self.mhca = self._build_attention() if attention else nn.Identity()
         else:
-            self.skip = Conv1x1(context_channels,context_channels)
+            self.skip = Conv1x1(context_channels,context_channels,activation=activation)
         self.attention = attention
     def _build_attention(self):
         assert self.attention, "Attention not enabled"
