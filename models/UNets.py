@@ -138,7 +138,7 @@ class EncoderBlock(nn.Module):
                 norm:bool=True,
                 act:Union[bool,nn.Module]=True,
                 pool:Union[bool,nn.Module]=False,
-                dropout:float=0.1,):
+                dropout:float=0.1):
         """
         Args:
             in_channels (int): Number of channels in the input image
@@ -578,8 +578,14 @@ class UNetDecoder(nn.Module):
         if self.verbose:
             self.logger = ModelLogger()
     def read_config(self,config_file):
+        """
+        If the config is a string, read the yaml file and return the config
+        """
         with open(config_file) as f:
-            config = yaml.load(f,Loader=yaml.FullLoader)
+            try:
+                config = yaml.load(f,Loader=yaml.FullLoader)
+            except:
+                raise Exception("Could not load config file: "+config_file)
         self.steps = config["steps"]
         self.num_classes = config["num_classes"]
         decoder_config = config["decoder"]
@@ -599,6 +605,9 @@ class UNetDecoder(nn.Module):
                 # print(f"Decoder config: {key} = {decoder_config[key]}")
         return decoder_config
     def build_decoder(self):
+        """
+        Build decoder using the config file
+        """
         decoder = []
         img_size = self.latent_size
         for i in range(self.steps):
@@ -615,7 +624,6 @@ class UNetDecoder(nn.Module):
                 conv1x1=self._decoder_config["conv1x1"][i],
                 conv3x3=self._decoder_config["conv3x3"][i],
                 activation=StrToActivation(self._decoder_config["activation"][i]),
-                # activation=StrToActivationDict[self.decoder_config["activation"][i]]
                 ))
             img_size = [img_size[0]*2,img_size[1]*2]
             self.attention_layers.append(i)
@@ -623,7 +631,7 @@ class UNetDecoder(nn.Module):
         decoder.append(OutputBlock(self._decoder_config["out_channels"][-1],self.num_classes,conv1x1=0,conv3x3=1))
         return nn.ModuleList(decoder)
     def forward(self,encoder_outputs:list[T.Tensor]):
-        x = encoder_outputs.pop()
+        x = encoder_outputs.pop() # Get the matching encoder output
         x_s = []
         attn_s = []
         for i,(layer,context) in enumerate(zip(self.decoder,reversed(encoder_outputs))):

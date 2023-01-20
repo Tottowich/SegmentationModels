@@ -210,7 +210,7 @@ class ADE20K(Dataset):
 
         self.dataset = ADE20KSegmentation(split='train' if train else 'val', transform=transform,crop_size=img_size,categorical=categorical)
         self.fraction = fraction if fraction is not None else 1.0
-        self.class_names = ADE20KSegmentation.CLASSES
+        self.class_names = [name.split(",")[0] for name in ADE20KSegmentation.CLASSES]
             
         self._num_classes = self.dataset.num_class
         self.cached = cache
@@ -271,7 +271,7 @@ class ADE20KSingleExample(Dataset):
         self._num_classes = self.dataset.num_class
         self.example = self.dataset[index]
         self.dataset = [self.example for _ in range(int(1000*fraction))]
-        self.class_names = ADE20KSegmentation.CLASSES
+        self.class_names = [name.split(",")[0] for name in ADE20KSegmentation.CLASSES]
     def __len__(self) -> int:
         return len(self.dataset)
 
