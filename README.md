@@ -49,7 +49,9 @@ The model architecture is based on the U-Net Transformer architecture from the p
 
 ## Data
 The data that was used is the ADE20K dataset. This dataset consists of 150 different classes that are as follows:
-|class names |FIELD2    |FIELD3   |FIELD4        |FIELD5          |FIELD6       |FIELD7       |FIELD8     |FIELD9        |FIELD10            |
+<details><summary>Class names</summary>
+
+|1           |2         |3        |4             |5               |6            |7            |8          |9             |10            |
 |------------|----------|---------|--------------|----------------|-------------|-------------|-----------|--------------|-------------------|
 |wall        |building  |sky      |floor         |tree            |ceiling      |road         |bed        |windowpane    |grass              |
 |cabinet     |sidewalk  |person   |earth         |door            |table        |mountain     |plant      |curtain       |chair              |
@@ -67,5 +69,8 @@ The data that was used is the ADE20K dataset. This dataset consists of 150 diffe
 |screen      |blanket   |sculpture|hood          |sconce          |vase         |traffic light|tray       |ashcan        |fan                |
 |pier        |crt screen|plate    |monitor       |bulletin board  |shower       |radiator     |glass      |clock         |flag               |
 |UNKNOWN     |          |         |              |                |             |             |           |              |                   |
+
+</details>
+
 
 
