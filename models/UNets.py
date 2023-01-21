@@ -521,14 +521,12 @@ class OutputBlock(nn.Module):
     def __init__(self,
                 in_channels:int,
                 out_channels:int,
-                conv1x1:bool=1,
-                conv3x3:int=1,
                 ):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
-        self.conv1x1 = Conv1x1(in_channels,out_channels,reps=conv1x1,activation=nn.Softmax(dim=1),norm=False) if conv1x1 else nn.Identity()
-        self.conv3x3 = Conv3x3(in_channels,out_channels,reps=conv3x3,activation=nn.Softmax(dim=1),norm=False) if conv3x3 else nn.Identity()
+        # self.conv1x1 = Conv1x1(in_channels,out_channels,reps=1,activation=nn.Softmax(dim=1),norm=False)
+        self.conv3x3 = Conv3x3(in_channels,out_channels,reps=1,activation=nn.Softmax(dim=1),norm=False)
     def forward(self,x):
         x = self.conv1x1(x)
         y = self.conv3x3(x)
@@ -619,7 +617,7 @@ class UNetDecoder(nn.Module):
             img_size = [img_size[0]*2,img_size[1]*2]
             self.attention_layers.append(i)
         # Replace last layer with softmax if not already
-        decoder.append(OutputBlock(self._decoder_config["out_channels"][-1],self.num_classes,conv1x1=0,conv3x3=1))
+        decoder.append(OutputBlock(self._decoder_config["out_channels"][-1],self.num_classes))
         return nn.ModuleList(decoder)
     def forward(self,encoder_outputs:list[T.Tensor]):
         x = encoder_outputs.pop() # Get the matching encoder output

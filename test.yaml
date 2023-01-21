@@ -1,4 +1,7 @@
 # This is a model configuration file for the attention unet model.
+in_channels: 3 # Number of input channels.
+num_classes: 151 # Number of classes in the dataset 
+steps: 4 # Depth of the U-Net
 decoder: # Decoder configuration
   activation: # Activation function per decoder block
   - relu
@@ -35,95 +38,95 @@ decoder: # Decoder configuration
   - 768
   - 768
   - 768
-  in_channels:
+  in_channels: # Number of input channels per decoder block
   - 512
   - 256
   - 128
   - 64
-  num_heads:
+  num_heads: # Number of heads for cross attention per decoder block
   - 8
   - 8
   - 8
   - 8
-  out_channels:
+  out_channels: # Number of output channels per decoder block
   - 256
   - 128
   - 64
   - 32
-  patch_size:
+  patch_size: # Patch size for cross attention per decoder block
   - 8
   - 8
   - 16
   - 16
   
 encoder:
-  acts:
+  acts: # Activation function per encoder block
   - true
   - true
   - true
   - true
-  attention:
+  attention: # Self attention per encoder block
   - false
   - false
   - true
   - false
-  attn_drop:
+  attn_drop: # Dropout for self attention per encoder block
   - 0.0
   - 0.0
   - 0.0
   - 0.0
-  depth:
+  depth: # Depth of each encoder block
   - 3
   - 2
   - 1
   - 1
-  dropout:
+  dropout: # Dropout for each encoder block
   - 0.0
   - 0.0
   - 0.0
   - 0.0
-  embed_dim:
+  embed_dim: # Embedding dimension for self attention per encoder block
   - 768
   - 768
   - 768
   - 768
-  img_size:
+  img_size: # Image size for self attention.
   - 256
   - 256
   - 256
   - 256
   in_channels: 3
-  kernel_size:
+  kernel_size: # Kernel size for each encoder block
   - 3
   - 3
   - 3
   - 3
-  norms:
+  norms: # Normalization boolean per encoder block
   - true
   - true
   - true
   - true
-  num_heads:
+  num_heads: # Number of heads for self attention per encoder block
   - 8
   - 8
   - 8
   - 8
-  out_channels:
+  out_channels: # Output channels per encoder block
   - 64
   - 128
   - 256
   - 512
-  padding:
+  padding: # Padding for each encoder block
   - 1
   - 1
   - 1
   - 1
-  patch_size:
+  patch_size: # Patch size for self attention per encoder block
   - 16
   - 16
   - 8
   - 8
-  pool:
+  pool: # Pooling boolean per encoder block, maxpooling is used.
   - true
   - true
   - true
@@ -133,6 +136,4 @@ encoder:
   - 1
   - 1
   - 1
-in_channels: 3
-num_classes: 151
-steps: 4
+

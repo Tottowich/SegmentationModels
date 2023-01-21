@@ -43,4 +43,12 @@ The model architecture is based on the U-Net Transformer architecture from the p
             * Multi Head Cross Attention (Optional per block) - Use of [visual self attention](https://arxiv.org/abs/2010.11929) but between encoder and decoder, please read [U-Net Transformer: Self and Cross Attention for Medical Image Segmentation](https://arxiv.org/abs/2103.06104) for more information under section 2.2. 
                 * Patch Embedding - Embedding of patches to be used in self attention, *decoder.embed_dim* and *decoder.patch_size*.
                 * Attention - Regular self attention, *decoder.num_heads*, *decoder.embed_dim*.
-                * Dropout - Dropout to be used in self attention, *encoder.attn_drop*.
+                * Dropout - Dropout to be used in self attention, *decoder.attn_drop*.
+        * Output Block
+            * Conv3x3 Block - 3x3 Convolutional block with softmax activation.
+
+## Data
+The data that was used is the ADE20K dataset. This dataset consists of 150 different classes that are as follows:
+* wall
+* building, edifice
+
