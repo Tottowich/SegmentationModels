@@ -6,6 +6,9 @@ The idea was to make the models configurable using a GUI or a config file. This 
 ## Model Architecture
 
 The model architecture is based on the U-Net Transformer architecture from the paper [U-Net Transformer: Self and Cross Attention for Medical Image Segmentation](https://arxiv.org/abs/2103.06104). The model is made up of a U-Net architecture with self attention blocks and cross attention blocks. The self attention blocks are both within the decoder and within the encoder. The cross attention blocks are between the encoder and decoder. The model is made up of the following blocks:
+
+<details><summary>Architecture</summary>
+
 * U-Net
     * Encoder
         * Encoder Block - Modifiable depth of encoder, *steps* in .yaml file
@@ -46,6 +49,8 @@ The model architecture is based on the U-Net Transformer architecture from the p
                 * Dropout - Dropout to be used in self attention, *decoder.attn_drop*.
         * Output Block
             * Conv3x3 Block - 3x3 Convolutional block with softmax activation.
+
+</details>
 
 ## Data
 The data that was used is the ADE20K dataset. This dataset consists of 150 different classes that are as follows:
