@@ -139,7 +139,6 @@ class IoUMeter(Metric):
         self.num_classes = num_classes
         self.reset()
     def _reset(self):
-        print("n_classes", self.num_classes, "type", type(self.num_classes))
         self.intersection = np.zeros(self.num_classes, dtype=np.int32)
         self.union = np.zeros(self.num_classes, dtype=np.int32)
     def _update(self, pred:Union[T.Tensor, np.ndarray], target:Union[T.Tensor, np.ndarray]):

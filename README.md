@@ -9,7 +9,7 @@ The model architecture is based on the U-Net Transformer architecture from the p
 
 <details><summary>Architecture</summary>
 
-* U-Net
+* U-Net Transformer
     * Encoder
         * Encoder Block - Modifiable depth of encoder, *steps* in .yaml file
             * Convolution Block - Modifiable depth per block, *encoder.depth*.
@@ -52,30 +52,34 @@ The model architecture is based on the U-Net Transformer architecture from the p
 
 </details>
 
+The model architecture can be edited in a .yaml file. The available parameters are as availabe in the dropdown above. The .yaml file is used to create the model and the model is then trained on the dataset. 
 ## Data
 The data that was used is the ADE20K dataset. This dataset consists of 150 different classes that are as follows:
+
 <details><summary>Class names</summary>
 
-|1           |2         |3        |4             |5               |6            |7            |8          |9             |10            |
-|------------|----------|---------|--------------|----------------|-------------|-------------|-----------|--------------|-------------------|
-|wall        |building  |sky      |floor         |tree            |ceiling      |road         |bed        |windowpane    |grass              |
-|cabinet     |sidewalk  |person   |earth         |door            |table        |mountain     |plant      |curtain       |chair              |
-|car         |water     |painting |sofa          |shelf           |house        |sea          |mirror     |rug           |field              |
-|armchair    |seat      |fence    |desk          |rock            |wardrobe     |lamp         |bathtub    |railing       |cushion            |
-|base        |box       |column   |signboard     |chest of drawers|counter      |sand         |sink       |skyscraper    |fireplace          |
-|refrigerator|grandstand|path     |stairs        |runway          |case         |pool table   |pillow     |screen door   |stairway           |
-|river       |bridge    |bookcase |blind         |coffee table    |toilet       |flower       |book       |hill          |bench              |
-|countertop  |stove     |palm     |kitchen island|computer        |swivel chair |boat         |bar        |arcade machine|hovel              |
-|bus         |towel     |light    |truck         |tower           |chandelier   |awning       |streetlight|booth         |television receiver|
-|airplane    |dirt track|apparel  |pole          |land            |bannister    |escalator    |ottoman    |bottle        |buffet             |
-|poster      |stage     |van      |ship          |fountain        |conveyer belt|canopy       |washer     |plaything     |swimming pool      |
-|stool       |barrel    |basket   |waterfall     |tent            |bag          |minibike     |cradle     |oven          |ball               |
-|food        |step      |tank     |trade name    |microwave       |pot          |animal       |bicycle    |lake          |dishwasher         |
-|screen      |blanket   |sculpture|hood          |sconce          |vase         |traffic light|tray       |ashcan        |fan                |
-|pier        |crt screen|plate    |monitor       |bulletin board  |shower       |radiator     |glass      |clock         |flag               |
-|UNKNOWN     |          |         |              |                |             |             |           |              |                   |
+| # |1           |2         |3        |4             |5               |6            |7            |8          |9             |10            |
+|---|------------|----------|---------|--------------|----------------|-------------|-------------|-----------|--------------|-------------------|
+|1  |wall        |building  |sky      |floor         |tree            |ceiling      |road         |bed        |windowpane    |grass              |
+|2  |cabinet     |sidewalk  |person   |earth         |door            |table        |mountain     |plant      |curtain       |chair              |
+|3  |car         |water     |painting |sofa          |shelf           |house        |sea          |mirror     |rug           |field              |
+|4  |armchair    |seat      |fence    |desk          |rock            |wardrobe     |lamp         |bathtub    |railing       |cushion            |
+|5  |base        |box       |column   |signboard     |chest of drawers|counter      |sand         |sink       |skyscraper    |fireplace          |
+|6  |refrigerator|grandstand|path     |stairs        |runway          |case         |pool table   |pillow     |screen door   |stairway           |
+|7  |river       |bridge    |bookcase |blind         |coffee table    |toilet       |flower       |book       |hill          |bench              |
+|8  |countertop  |stove     |palm     |kitchen island|computer        |swivel chair |boat         |bar        |arcade machine|hovel              |
+|9  |bus         |towel     |light    |truck         |tower           |chandelier   |awning       |streetlight|booth         |television receiver|
+|10 |airplane    |dirt track|apparel  |pole          |land            |bannister    |escalator    |ottoman    |bottle        |buffet             |
+|11 |poster      |stage     |van      |ship          |fountain        |conveyer belt|canopy       |washer     |plaything     |swimming pool      |
+|12 |stool       |barrel    |basket   |waterfall     |tent            |bag          |minibike     |cradle     |oven          |ball               |
+|13 |food        |step      |tank     |trade name    |microwave       |pot          |animal       |bicycle    |lake          |dishwasher         |
+|14 |screen      |blanket   |sculpture|hood          |sconce          |vase         |traffic light|tray       |ashcan        |fan                |
+|15 |pier        |crt screen|plate    |monitor       |bulletin board  |shower       |radiator     |glass      |clock         |flag               |
+|16 |UNKNOWN     |          |         |              |                |             |             |           |              |                   |
 
 </details>
+
+<details><summary>Class colors</summary>
 
 
 

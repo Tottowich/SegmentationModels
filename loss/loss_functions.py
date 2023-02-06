@@ -58,16 +58,9 @@ class UNetLossFunction(nn.Module):
         dice = self.dice(y_pred, y_true)
         return self.alpha*bce + self.beta*dice
     def test_loss(self):
-        y_true = T.randint(0,2,(1, 3, 10, 10),dtype=T.float32).requires_grad_(True)
+        y_true = T.randint(0,2,(1, 3, 10, 10),dtype=T.float32,requires_grad=True)
         # y_pred = T.randint(0,2,(1, 3, 10, 10))
-        y_pred = T.rand(1, 3, 10, 10,dtype=T.float32).requires_grad_(True)
-        # plt.subplot(1, 2, 1)
-        # plt.imshow(y_pred[0].detach().numpy().transpose(1,2,0))
-        # plt.subplot(1, 2, 2)
-        # print(y_true.shape)
-        # print(y_true[0,1][None].shape)
-        # plt.imshow(y_true[0,1][None].detach().numpy().transpose(1,2,0)*255,cmap="gray")
-        # plt.show()
+        y_pred = T.rand(1, 3, 10, 10,dtype=T.float32,requires_grad=True) # .requires_grad_(True)
         return self(y_pred, y_true)
         # Print the y_true as matrix of 0,1,2
 if __name__ == "__main__":

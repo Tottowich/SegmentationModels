@@ -302,7 +302,7 @@ def _get_ade20k_pairs(folder, mode='train'):
     else:
         img_folder = os.path.join(folder, 'images/validation')
         mask_folder = os.path.join(folder, 'annotations/validation')
-    for filename in tqdm(os.listdir(img_folder), desc='ADE20K adding pat'):
+    for filename in tqdm(os.listdir(img_folder), desc='ADE20K adding paths'):
         basename, _ = os.path.splitext(filename)
         if filename.endswith(".jpg"):
             imgpath = os.path.join(img_folder, filename)

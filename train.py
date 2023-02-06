@@ -8,6 +8,7 @@ from torch import optim
 from loss.loss_functions import UNetLossFunction
 from typing import Type, Union, List, Tuple, Dict, Optional
 import warnings
+import argparse
 # Interupt on user warning
 warnings.simplefilter("error", UserWarning)
 # Create model
@@ -38,11 +39,20 @@ def create_optimizer(opt:str="SGD",model=None,hyps:dict=None)->Type[optim.Adam]:
 
 # Create loss function
 def create_criterion()->Type[UNetLossFunction]:
+    """
+    Create loss function
+    """
     loss_function = UNetLossFunction()
     return loss_function
 
-# Create dataloader
 def create_ADE20K_dataset(img_size,cache,fraction,transform=None,single_example=False,index=0)->Type[ADE20K]:
+    """
+    Create ADE20K dataset
+    INPUT:
+        img_size: tuple of ints - size of image to use
+        cache: bool - cache dataset
+        fraction: float - fraction of dataset to use
+    """
     if single_example:
         dataset = ADE20KSingleExample(img_size=img_size,transform=transform,fraction=fraction,categorical=True,index=index)
     else:
@@ -111,7 +121,6 @@ def create_trainer(
         pbar=pbar,
     )
     return trainer
-import argparse
 def input_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--gui",action="store_true",help="Use GUI to select config file")

@@ -17,7 +17,7 @@ from data.loaders_utils import plot_polygon
 from utils.helper import to_2tuple
 from sklearn.utils import class_weight
 import matplotlib.pyplot as plt
-from typing import List, Tuple, Union, Optional, Callable
+from typing import List, Tuple, Union, Optional, Callable,Type
 class ADE20K_Dataset(Dataset):
     def __init__(self, root, img_size:tuple=(256,256), split=None, transform=None,target_transform=None,cache=False):
         self.num_classes = 150
@@ -216,9 +216,23 @@ class ADE20K(Dataset):
         self.cached = cache
         if cache:
             self._cache_data()
+        if fraction<1.0:
+            # self.dataset = Subset(self.dataset, indices=range(int(len(self.dataset)*fraction)))
+            pass
     def _cache_data(self):
         """ Cache the data in memory """
         print(f"Caching {len(self)} images in memory")
+        # Calculate the memeory usage of caching the data in memory before doing it
+        mem_usage = len(self)*self.img_size**2*3*4/1024**3 # 4 bytes per float32, 3 channels per image and divide by 1024**3 to get GB
+        # Get the available memory
+        import psutil
+        mem_available = psutil.virtual_memory().available/1024**3
+        if mem_usage>mem_available:
+            print(f"Warning: Caching the data will use {mem_usage:.2f} GB of memory, but only {mem_available:.2f} GB is available. Caching will be skipped.")
+            self.cached = False
+            return
+        else:
+            print(f"Caching will use {mem_usage:.2f} GB of memory")
         self.data = [self.dataset[i] for i in tqdm(range(int(len(self.dataset)*self.fraction)), desc='Caching data')]
     def __len__(self) -> int:
         return int(len(self.dataset)*self.fraction)
@@ -315,6 +329,19 @@ def split_dataset(dataset:Dataset,split:list[float,float,float]=[0.9,0.05,0.05])
     test_len = len(dataset) - train_len - val_len
     return random_split(dataset, [train_len, val_len, test_len])
 
+def create_ADE20K_dataset(img_size,cache,fraction,transform=None,single_example=False,index=0)->Union[ADE20K,ADE20KSingleExample]:
+    """
+    Create ADE20K dataset
+    INPUT:
+        img_size: tuple of ints - size of image to use
+        cache: bool - cache dataset
+        fraction: float - fraction of dataset to use
+    """
+    if single_example:
+        dataset = ADE20KSingleExample(img_size=img_size,transform=transform,fraction=fraction,categorical=True,index=index)
+    else:
+        dataset = ADE20K(cache=cache,img_size=img_size,fraction=fraction,transform=transform,categorical=True)
+    return dataset
 
 
 

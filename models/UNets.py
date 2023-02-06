@@ -528,7 +528,7 @@ class OutputBlock(nn.Module):
         # self.conv1x1 = Conv1x1(in_channels,out_channels,reps=1,activation=nn.Softmax(dim=1),norm=False)
         self.conv3x3 = Conv3x3(in_channels,out_channels,reps=1,activation=nn.Softmax(dim=1),norm=False)
     def forward(self,x):
-        x = self.conv1x1(x)
+        # x = self.conv1x1(x)
         y = self.conv3x3(x)
         return y
 class UNetDecoder(nn.Module):
